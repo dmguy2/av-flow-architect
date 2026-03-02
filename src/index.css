@@ -1,0 +1,225 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0a;
+  --color-primary: #171717;
+  --color-primary-foreground: #fafafa;
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #171717;
+  --color-muted: #f0f0f0;
+  --color-muted-foreground: #6b6b6b;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
+  --color-border: #e2e2e2;
+  --color-input: #e2e2e2;
+  --color-ring: #0a0a0a;
+  --radius: 0.5rem;
+
+  --color-signal-audio: #3B82F6;
+  --color-signal-video: #22C55E;
+  --color-signal-data: #A855F7;
+  --color-signal-power: #F97316;
+  --color-signal-lighting: #EAB308;
+
+  --color-sidebar: #fafafa;
+  --color-sidebar-foreground: #0a0a0a;
+  --color-sidebar-border: #e5e5e5;
+}
+
+.dark {
+  --color-background: #09090b;
+  --color-foreground: #e8e8ed;
+  --color-card: #0f0f12;
+  --color-card-foreground: #e8e8ed;
+  --color-popover: #0f0f12;
+  --color-popover-foreground: #e8e8ed;
+  --color-primary: #e8e8ed;
+  --color-primary-foreground: #0f0f12;
+  --color-secondary: #1a1a1f;
+  --color-secondary-foreground: #e8e8ed;
+  --color-muted: #1a1a1f;
+  --color-muted-foreground: #8b8b96;
+  --color-accent: #1a1a1f;
+  --color-accent-foreground: #e8e8ed;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #fafafa;
+  --color-border: #1e1e24;
+  --color-input: #1e1e24;
+  --color-ring: #d4d4d4;
+
+  --color-sidebar: #0c0c0f;
+  --color-sidebar-foreground: #e8e8ed;
+  --color-sidebar-border: #1e1e24;
+}
+
+body {
+  @apply bg-background text-foreground;
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Animations ── */
+
+@keyframes node-appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes issue-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.3); }
+}
+
+@keyframes panel-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-node-appear {
+  animation: node-appear 0.2s ease-out;
+}
+
+.animate-issue-pulse {
+  animation: issue-pulse 2s ease-in-out infinite;
+}
+
+.animate-panel-slide-in {
+  animation: panel-slide-in 0.15s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+/* ── React Flow overrides ── */
+
+.react-flow__node {
+  font-family: system-ui, -apple-system, sans-serif;
+  animation: node-appear 0.2s ease-out;
+}
+
+/* ── MiniMap: frosted glass panel ── */
+
+.av-minimap.react-flow__minimap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 15, 18, 0.7) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.av-minimap.react-flow__minimap:hover {
+  opacity: 1;
+}
+
+/* Hide the React Flow attribution inside minimap */
+.av-minimap .react-flow__minimap-svg {
+  display: block;
+}
+
+/* ── Controls: floating pill ── */
+
+.av-controls.react-flow__controls {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 15, 18, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.av-controls.react-flow__controls:hover {
+  opacity: 1;
+}
+
+.av-controls .react-flow__controls-button {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.av-controls .react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.av-controls .react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.av-controls .react-flow__controls-button svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* ── Attribution watermark ── */
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* ── Dark mode canvas ── */
+
+.dark .react-flow__background {
+  opacity: 0.4;
+}
+
+.dark .react-flow {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.02) 0%, transparent 60%),
+    var(--color-background);
+}

@@ -1,0 +1,471 @@
+import { useMemo } from 'react'
+import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { useDiagramStore } from '@/store/diagram-store'
+import { getSignalColor, SIGNAL_LABELS } from '@/lib/signal-colors'
+import { getComponentDef } from '@/data/component-definitions'
+import { getIcon } from '@/lib/icons'
+import { generateId } from '@/lib/utils'
+import type { AVPort, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole } from '@/types/av'
+import { CONNECTOR_VARIANTS, VARIANT_LABELS } from '@/lib/connector-variants'
+
+export default function PropertiesPanel() {
+  const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
+
+  const selectedNode = useMemo(
+    () => nodes.find((n) => n.id === selectedNodeId),
+    [nodes, selectedNodeId]
+  )
+
+  const selectedEdge = useMemo(
+    () => edges.find((e) => e.id === selectedEdgeId),
+    [edges, selectedEdgeId]
+  )
+
+  // Edge properties view
+  if (!selectedNode && selectedEdge) {
+    const edgeData = selectedEdge.data
+    const sourceNode = nodes.find((n) => n.id === selectedEdge.source)
+    const targetNode = nodes.find((n) => n.id === selectedEdge.target)
+    const color = edgeData ? getSignalColor(edgeData.domain) : '#888'
+
+    return (
+      <div className="border-l border-border bg-sidebar flex flex-col h-full animate-panel-slide-in">
+        <div className="p-3 pb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Cable className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Connection
+            </h2>
+          </div>
+        </div>
+        <Separator />
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-4">
+            {/* Cable Label */}
+            <div className="space-y-1">
+              <Label className="text-xs">Cable Label</Label>
+              <Input
+                value={edgeData?.label ?? ''}
+                onChange={(e) => updateEdgeData(selectedEdge.id, { label: e.target.value || undefined })}
+                placeholder="e.g. C-01, Snake 1"
+                className="h-7 text-xs"
+              />
+            </div>
+
+            {/* Signal Domain */}
+            <div className="space-y-1">
+              <Label className="text-xs">Signal Domain</Label>
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: color }}
+                />
+                <select
+                  value={edgeData?.domain ?? 'audio'}
+                  onChange={(e) => updateEdgeData(selectedEdge.id, { domain: e.target.value as SignalDomain })}
+                  className="h-7 text-xs border border-input rounded px-2 bg-transparent flex-1"
+                >
+                  <option value="audio">Audio</option>
+                  <option value="video">Video</option>
+                  <option value="network">Network</option>
+                  <option value="power">Power</option>
+                  <option value="av-over-ip">AV-over-IP</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Connector Type */}
+            <div className="space-y-1">
+              <Label className="text-xs">Connector</Label>
+              <select
+                value={edgeData?.connector ?? 'xlr'}
+                onChange={(e) => updateEdgeData(selectedEdge.id, { connector: e.target.value as ConnectorType })}
+                className="h-7 text-xs border border-input rounded px-2 bg-transparent w-full"
+              >
+                <option value="xlr">XLR</option>
+                <option value="trs">TRS</option>
+                <option value="rca">RCA</option>
+                <option value="hdmi">HDMI</option>
+                <option value="sdi">SDI</option>
+                <option value="ethernet">Ethernet</option>
+                <option value="dante">Dante</option>
+                <option value="usb">USB</option>
+                <option value="speakon">Speakon</option>
+                <option value="powercon">powerCON</option>
+                <option value="dmx">DMX</option>
+                <option value="fiber">Fiber</option>
+                <option value="aes50">AES50</option>
+                <option value="ndi">NDI</option>
+                <option value="wifi">Wi-Fi</option>
+                <option value="thunderbolt">Thunderbolt</option>
+                <option value="db9">DB-9</option>
+                <option value="bnc">BNC</option>
+                <option value="displayport">DisplayPort</option>
+              </select>
+            </div>
+
+            <Separator />
+
+            {/* Connection info */}
+            <div className="space-y-2">
+              <Label className="text-xs">Route</Label>
+              <div className="text-[11px] space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">From:</span>
+                  <span className="font-medium">{sourceNode?.data.label ?? 'Unknown'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-muted-foreground">To:</span>
+                  <span className="font-medium">{targetNode?.data.label ?? 'Unknown'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Connection warning */}
+            {edgeData?.warning && (
+              <div className="flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5">
+                <TriangleAlert className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <span className="text-[11px] text-amber-600 dark:text-amber-400 leading-tight">
+                  {edgeData.warning}
+                </span>
+              </div>
+            )}
+
+            <Separator />
+
+            <Button
+              variant="destructive"
+              size="sm"
+              className="w-full"
+              onClick={deleteSelected}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Delete Connection
+            </Button>
+          </div>
+        </ScrollArea>
+      </div>
+    )
+  }
+
+  // No selection
+  if (!selectedNode) {
+    return (
+      <div className="border-l border-border bg-sidebar flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-xs text-muted-foreground leading-relaxed">
+          Select a component or connection to view its properties
+        </div>
+      </div>
+    )
+  }
+
+  // Node properties view
+  const data = selectedNode.data
+  const def = getComponentDef(data.componentType)
+  const Icon = getIcon(def?.icon ?? 'BoxSelect')
+
+  const isGeneric = data.isGenericInstance !== false
+  const isConfigurable = !!data.configurableIO
+  const isRealGearFixed = !isGeneric && !isConfigurable
+
+  const CONNECTOR_LABELS: Record<string, string> = {
+    xlr: 'XLR', trs: 'TRS', rca: 'RCA', hdmi: 'HDMI', sdi: 'SDI',
+    ethernet: 'Ethernet', dante: 'Dante', usb: 'USB', speakon: 'Speakon',
+    powercon: 'powerCON', dmx: 'DMX', fiber: 'Fiber', aes50: 'AES50', ndi: 'NDI',
+    wifi: 'Wi-Fi', thunderbolt: 'Thunderbolt', db9: 'DB-9', bnc: 'BNC',
+    displayport: 'DisplayPort',
+  }
+
+  const addPort = (direction: PortDirection) => {
+    const newPort: AVPort = {
+      id: generateId(),
+      label: direction === 'input' ? `In ${data.ports.length + 1}` : `Out ${data.ports.length + 1}`,
+      domain: 'audio' as SignalDomain,
+      connector: 'xlr' as ConnectorType,
+      direction,
+    }
+    updateNodeData(selectedNode.id, { ports: [...data.ports, newPort] })
+  }
+
+  const removePort = (portId: string) => {
+    updateNodeData(selectedNode.id, {
+      ports: data.ports.filter((p: AVPort) => p.id !== portId),
+    })
+  }
+
+  const updatePort = (portId: string, updates: Partial<AVPort>) => {
+    updateNodeData(selectedNode.id, {
+      ports: data.ports.map((p: AVPort) => (p.id === portId ? { ...p, ...updates } : p)),
+    })
+  }
+
+  const togglePortEnabled = (portId: string) => {
+    updateNodeData(selectedNode.id, {
+      ports: data.ports.map((p: AVPort) =>
+        p.id === portId ? { ...p, enabled: !(p.enabled ?? true) } : p
+      ),
+    })
+  }
+
+  return (
+    <div className="border-l border-border bg-sidebar flex flex-col h-full animate-panel-slide-in">
+      <div className="p-3 pb-2">
+        <div className="flex items-center gap-2 mb-2">
+          <Icon className="w-4 h-4 text-muted-foreground" />
+          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Properties
+          </h2>
+        </div>
+      </div>
+      <Separator />
+      <ScrollArea className="flex-1">
+        <div className="p-3 space-y-4">
+          {/* Label */}
+          <div className="space-y-1">
+            <Label className="text-xs">Label</Label>
+            <Input
+              value={data.label}
+              onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
+              className="h-7 text-xs"
+            />
+          </div>
+
+          {/* Manufacturer (read-only for real gear) */}
+          {data.manufacturer && (
+            <div className="space-y-1">
+              <Label className="text-xs">Manufacturer</Label>
+              <div className="text-xs text-foreground px-3 py-1.5 bg-muted/50 rounded-md border border-border">
+                {data.manufacturer}
+              </div>
+            </div>
+          )}
+
+          {/* Model */}
+          <div className="space-y-1">
+            <Label className="text-xs">Model</Label>
+            {isGeneric ? (
+              <Input
+                value={data.model ?? ''}
+                onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value })}
+                placeholder="e.g. Yamaha CL5"
+                className="h-7 text-xs"
+              />
+            ) : (
+              <div className="text-xs text-foreground px-3 py-1.5 bg-muted/50 rounded-md border border-border">
+                {data.model ?? '—'}
+              </div>
+            )}
+          </div>
+
+          {/* Power Draw (when present) */}
+          {data.powerDraw && (
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                Power Draw
+              </Label>
+              <div className="text-xs text-foreground px-3 py-1.5 bg-muted/50 rounded-md border border-border">
+                {data.powerDraw}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="space-y-1">
+            <Label className="text-xs">Notes</Label>
+            <textarea
+              value={data.notes ?? ''}
+              onChange={(e) => updateNodeData(selectedNode.id, { notes: e.target.value })}
+              placeholder="Additional notes..."
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Device Role */}
+          <div className="space-y-1">
+            <Label className="text-xs">Device Role</Label>
+            <select
+              value={data.deviceRole ?? ''}
+              onChange={(e) => updateNodeData(selectedNode.id, { deviceRole: (e.target.value || undefined) as DeviceRole | undefined })}
+              className="h-7 text-xs border border-input rounded px-2 bg-transparent w-full"
+            >
+              <option value="">Not set</option>
+              <option value="source">Source</option>
+              <option value="destination">Destination</option>
+              <option value="processor">Processor</option>
+              <option value="infrastructure">Infrastructure</option>
+            </select>
+          </div>
+
+          <Separator />
+
+          {/* Ports — Mode 1: Generic (free edit) */}
+          {isGeneric && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Ports</Label>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => addPort('input')} title="Add input port">
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => addPort('output')} title="Add output port">
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {data.ports.map((port: AVPort) => {
+                  const variants = CONNECTOR_VARIANTS[port.connector] ?? []
+                  return (
+                    <div key={port.id} className="space-y-1 group">
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: getSignalColor(port.domain) }}
+                          title={SIGNAL_LABELS[port.domain]}
+                        />
+                        <Input
+                          value={port.label}
+                          onChange={(e) => updatePort(port.id, { label: e.target.value })}
+                          className="h-6 text-[10px] flex-1"
+                        />
+                        <select
+                          value={port.domain}
+                          onChange={(e) => updatePort(port.id, { domain: e.target.value as SignalDomain })}
+                          className="h-6 text-[10px] border border-input rounded px-1 bg-transparent"
+                        >
+                          <option value="audio">Audio</option>
+                          <option value="video">Video</option>
+                          <option value="network">Network</option>
+                          <option value="power">Power</option>
+                          <option value="av-over-ip">AV-over-IP</option>
+                        </select>
+                        <select
+                          value={port.direction}
+                          onChange={(e) => updatePort(port.id, { direction: e.target.value as PortDirection })}
+                          className="h-6 text-[10px] border border-input rounded px-1 bg-transparent"
+                        >
+                          <option value="input">In</option>
+                          <option value="output">Out</option>
+                          <option value="bidirectional">Bi</option>
+                          <option value="undefined">?</option>
+                        </select>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                          onClick={() => removePort(port.id)}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      {variants.length > 0 && (
+                        <div className="flex items-center gap-1.5 pl-3.5">
+                          <select
+                            value={port.variant ?? ''}
+                            onChange={(e) => updatePort(port.id, {
+                              variant: (e.target.value || undefined) as ConnectorVariant | undefined,
+                            })}
+                            className="h-5 text-[9px] border border-input rounded px-1 bg-transparent flex-1 text-muted-foreground"
+                          >
+                            <option value="">No variant</option>
+                            {variants.map((v) => (
+                              <option key={v} value={v}>{VARIANT_LABELS[v]}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Ports — Mode 2: Real gear, fixed I/O (read-only) */}
+          {isRealGearFixed && (
+            <div className="space-y-2">
+              <Label className="text-xs">Ports (Fixed I/O)</Label>
+              <div className="space-y-1">
+                {data.ports.map((port: AVPort) => (
+                  <div key={port.id} className="flex items-center gap-1.5 px-1 py-0.5">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: getSignalColor(port.domain) }}
+                      title={SIGNAL_LABELS[port.domain]}
+                    />
+                    <span className="text-[10px] flex-1 truncate">{port.label}</span>
+                    <span className="text-[9px] text-muted-foreground shrink-0">
+                      {CONNECTOR_LABELS[port.connector] ?? port.connector}
+                      {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ports — Mode 3: Configurable I/O (toggle switches) */}
+          {isConfigurable && (
+            <div className="space-y-2">
+              <Label className="text-xs">Ports (Configurable I/O)</Label>
+              <div className="space-y-1">
+                {data.ports.map((port: AVPort) => {
+                  const enabled = port.enabled ?? true
+                  return (
+                    <div
+                      key={port.id}
+                      className="flex items-center gap-1.5 px-1 py-0.5"
+                      style={{ opacity: enabled ? 1 : 0.5 }}
+                    >
+                      <button
+                        onClick={() => togglePortEnabled(port.id)}
+                        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                        title={enabled ? 'Disable port' : 'Enable port'}
+                      >
+                        {enabled ? (
+                          <ToggleRight className="w-4 h-4 text-primary" />
+                        ) : (
+                          <ToggleLeft className="w-4 h-4" />
+                        )}
+                      </button>
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: getSignalColor(port.domain) }}
+                        title={SIGNAL_LABELS[port.domain]}
+                      />
+                      <span className="text-[10px] flex-1 truncate">{port.label}</span>
+                      <span className="text-[9px] text-muted-foreground shrink-0">
+                        {CONNECTOR_LABELS[port.connector] ?? port.connector}
+                        {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Delete */}
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full"
+            onClick={deleteSelected}
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
+            Delete Component
+          </Button>
+        </div>
+      </ScrollArea>
+    </div>
+  )
+}

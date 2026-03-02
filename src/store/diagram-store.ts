@@ -1,0 +1,914 @@
+import { create } from 'zustand'
+import {
+  type Node,
+  type Edge,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type Connection,
+  applyNodeChanges,
+  applyEdgeChanges,
+  addEdge,
+} from '@xyflow/react'
+import type { AVNodeData, AVEdgeData, DiagramMode, AVProject, AVPort, SignalDomain, ProjectPage } from '@/types/av'
+import { validateConnection } from '@/lib/connection-validation'
+import { traceSignalChains } from '@/lib/signal-chain'
+import { analyzeChainsDeterministic, type ChainIssue } from '@/lib/signal-chain-rules'
+import { analyzeChainWithLLM, type LLMChainIssue } from '@/lib/chain-analysis-api'
+import type { SignalChain } from '@/lib/signal-chain'
+import { migrateNodes, migrateEdges } from '@/lib/domain-migration'
+import type { GroupNodeData } from '@/components/canvas/GroupNode'
+import { generateId } from '@/lib/utils'
+import { db } from '@/db'
+
+interface HistorySnapshot {
+  nodes: Node<AVNodeData>[]
+  edges: Edge<AVEdgeData>[]
+}
+
+interface DiagramState {
+  // Project
+  projectId: string
+  projectName: string
+  mode: DiagramMode
+  isDirty: boolean
+
+  // Pages
+  pages: ProjectPage[]
+  activePageId: string
+
+  // Canvas (active page view)
+  nodes: Node<AVNodeData>[]
+  edges: Edge<AVEdgeData>[]
+  selectedNodeId: string | null
+
+  // History (per-page, resets on page switch)
+  past: HistorySnapshot[]
+  future: HistorySnapshot[]
+
+  // Theme
+  darkMode: boolean
+
+  // Page actions
+  addPage: (label?: string) => void
+  deletePage: (pageId: string) => void
+  renamePage: (pageId: string, label: string) => void
+  setActivePage: (pageId: string) => void
+  getActivePageIndex: () => number
+
+  // Actions
+  onNodesChange: OnNodesChange<Node<AVNodeData>>
+  onEdgesChange: OnEdgesChange<Edge<AVEdgeData>>
+  onConnect: (connection: Connection) => void
+  addNode: (node: Node<AVNodeData>) => void
+  deleteSelected: () => void
+  setSelectedNode: (id: string | null) => void
+  updateNodeData: (nodeId: string, data: Partial<AVNodeData>) => void
+  setMode: (mode: DiagramMode) => void
+  setProjectName: (name: string) => void
+  setDarkMode: (dark: boolean) => void
+
+  // History
+  undo: () => void
+  redo: () => void
+  pushHistory: () => void
+
+  // Persistence
+  saveProject: () => Promise<void>
+  loadProject: (id: string) => Promise<void>
+  newProject: (name?: string) => void
+  loadProjects: () => Promise<AVProject[]>
+  deleteProject: (id: string) => Promise<void>
+  setNodesAndEdges: (nodes: Node<AVNodeData>[], edges: Edge<AVEdgeData>[]) => void
+
+  // Grouping
+  groupSelectedNodes: (label?: string, color?: string) => void
+  ungroupNodes: (groupId: string) => void
+
+  // Edge data
+  updateEdgeData: (edgeId: string, data: Partial<AVEdgeData>) => void
+  selectedEdgeId: string | null
+  setSelectedEdge: (id: string | null) => void
+
+  // Bulk operations
+  duplicateSelected: () => void
+  alignNodes: (axis: 'horizontal' | 'vertical') => void
+  distributeNodes: (axis: 'horizontal' | 'vertical') => void
+
+  // File import/export
+  exportProjectFile: () => void
+  importProjectFile: (file: File) => Promise<void>
+
+  // Clipboard
+  clipboard: { nodes: Node<AVNodeData>[]; edges: Edge<AVEdgeData>[] } | null
+  copySelected: () => void
+  pasteClipboard: () => void
+  selectAll: () => void
+
+  // Layers
+  layerVisibility: Record<SignalDomain, boolean>
+  focusedLayer: SignalDomain | null
+  showEdgeLabels: boolean
+  showProductImages: boolean
+  setShowProductImages: (show: boolean) => void
+  toggleLayerVisibility: (domain: SignalDomain) => void
+  setFocusedLayer: (domain: SignalDomain | null) => void
+  setShowEdgeLabels: (show: boolean) => void
+
+  // Signal chain analysis
+  signalChains: SignalChain[]
+  chainIssues: ChainIssue[]
+  llmIssues: LLMChainIssue[]
+  isAnalyzing: boolean
+  llmAnalysisSummary: string | null
+  showSignalChainPanel: boolean
+  setShowSignalChainPanel: (show: boolean) => void
+  runSignalChainAnalysis: () => void
+  runLLMAnalysis: (chainId: string) => Promise<void>
+  clearChainAnalysis: () => void
+}
+
+const MAX_HISTORY = 50
+
+const defaultPageId = generateId()
+
+export const useDiagramStore = create<DiagramState>((set, get) => ({
+  projectId: generateId(),
+  projectName: 'Untitled Diagram',
+  mode: 'signal-flow',
+  isDirty: false,
+
+  pages: [{ id: defaultPageId, label: 'Page 1', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }],
+  activePageId: defaultPageId,
+
+  nodes: [],
+  edges: [],
+  selectedNodeId: null,
+  selectedEdgeId: null,
+
+  past: [],
+  future: [],
+
+  clipboard: null,
+  darkMode: window.matchMedia('(prefers-color-scheme: dark)').matches,
+
+  layerVisibility: { audio: true, video: true, network: true, power: true, 'av-over-ip': true },
+  focusedLayer: null,
+  showEdgeLabels: false,
+  showProductImages: false,
+
+  // Signal chain analysis
+  signalChains: [],
+  chainIssues: [],
+  llmIssues: [],
+  isAnalyzing: false,
+  llmAnalysisSummary: null,
+  showSignalChainPanel: false,
+  setShowSignalChainPanel: (show) => set({ showSignalChainPanel: show }),
+
+  onNodesChange: (changes) => {
+    set((state) => ({
+      nodes: applyNodeChanges(changes, state.nodes),
+      isDirty: true,
+    }))
+  },
+
+  onEdgesChange: (changes) => {
+    set((state) => ({
+      edges: applyEdgeChanges(changes, state.edges),
+      isDirty: true,
+    }))
+  },
+
+  onConnect: (connection: Connection) => {
+    const { nodes, pushHistory } = get()
+    pushHistory()
+
+    const sourcePortId = connection.sourceHandle?.replace(/-(?:target|source)$/, '') ?? connection.sourceHandle
+    const targetPortId = connection.targetHandle?.replace(/-(?:target|source)$/, '') ?? connection.targetHandle
+    const sourceNode = nodes.find((n) => n.id === connection.source)
+    const sourcePort = sourceNode?.data.ports.find(
+      (p: AVPort) => p.id === sourcePortId
+    )
+    const targetNode = nodes.find((n) => n.id === connection.target)
+    const targetPort = targetNode?.data.ports.find(
+      (p: AVPort) => p.id === targetPortId
+    )
+
+    const edgeData: AVEdgeData = {
+      domain: sourcePort?.domain ?? 'audio',
+      connector: sourcePort?.connector ?? 'xlr',
+    }
+
+    // Attach warning if validation produces a warn-tier result
+    if (sourcePort && targetPort) {
+      const result = validateConnection(sourcePort, targetPort)
+      if (result.tier === 'warn' && result.message) {
+        edgeData.warning = result.message
+      }
+    }
+
+    set((state) => ({
+      edges: addEdge(
+        {
+          ...connection,
+          type: 'avEdge',
+          data: edgeData,
+        },
+        state.edges
+      ),
+      isDirty: true,
+    }))
+  },
+
+  addNode: (node) => {
+    const { pushHistory } = get()
+    pushHistory()
+    set((state) => ({
+      nodes: [...state.nodes, node],
+      isDirty: true,
+    }))
+  },
+
+  deleteSelected: () => {
+    const { pushHistory, selectedNodeId, selectedEdgeId } = get()
+    pushHistory()
+    set((state) => {
+      // If an edge is selected, delete it
+      if (selectedEdgeId) {
+        return {
+          edges: state.edges.filter((e) => e.id !== selectedEdgeId),
+          selectedEdgeId: null,
+          isDirty: true,
+        }
+      }
+      // Otherwise delete selected nodes + their connected edges
+      return {
+        nodes: state.nodes.filter((n) => !n.selected),
+        edges: state.edges.filter(
+          (e) =>
+            !state.nodes.some((n) => n.selected && (e.source === n.id || e.target === n.id))
+        ),
+        selectedNodeId: state.nodes.find((n) => n.selected)?.id === selectedNodeId ? null : selectedNodeId,
+        isDirty: true,
+      }
+    })
+  },
+
+  setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
+
+  updateNodeData: (nodeId, data) => {
+    const { pushHistory } = get()
+    pushHistory()
+    set((state) => ({
+      nodes: state.nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
+      ),
+      isDirty: true,
+    }))
+  },
+
+  setMode: (mode) => {
+    const nodeType = mode === 'signal-flow' ? 'signalFlow' : 'physicalLayout'
+    set((state) => ({
+      mode,
+      nodes: state.nodes.map((n) =>
+        n.type === 'group' || n.type === 'offsheetConnector' ? n : { ...n, type: nodeType }
+      ),
+    }))
+  },
+  setProjectName: (name) => set({ projectName: name, isDirty: true }),
+  setDarkMode: (dark) => {
+    document.documentElement.classList.toggle('dark', dark)
+    set({ darkMode: dark })
+  },
+
+  // ── Page management ──
+
+  addPage: (label?: string) => {
+    const { pages, nodes, edges, activePageId } = get()
+    const newPageId = generateId()
+    const newLabel = label ?? `Page ${pages.length + 1}`
+
+    // Save current page state before switching
+    const updatedPages = pages.map((p) =>
+      p.id === activePageId ? { ...p, nodes, edges } : p
+    )
+
+    const newPage: ProjectPage = {
+      id: newPageId,
+      label: newLabel,
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }
+
+    set({
+      pages: [...updatedPages, newPage],
+      activePageId: newPageId,
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      past: [],
+      future: [],
+      isDirty: true,
+    })
+  },
+
+  deletePage: (pageId: string) => {
+    const { pages, activePageId } = get()
+    if (pages.length <= 1) return // Can't delete last page
+
+    const remaining = pages.filter((p) => p.id !== pageId)
+    if (activePageId === pageId) {
+      // Switch to first remaining page
+      const target = remaining[0]
+      set({
+        pages: remaining,
+        activePageId: target.id,
+        nodes: target.nodes,
+        edges: target.edges,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+        past: [],
+        future: [],
+        isDirty: true,
+      })
+    } else {
+      set({ pages: remaining, isDirty: true })
+    }
+  },
+
+  renamePage: (pageId: string, label: string) => {
+    set((state) => ({
+      pages: state.pages.map((p) => (p.id === pageId ? { ...p, label } : p)),
+      isDirty: true,
+    }))
+  },
+
+  setActivePage: (pageId: string) => {
+    const { pages, activePageId, nodes, edges } = get()
+    if (pageId === activePageId) return
+
+    // Save current page state
+    const updatedPages = pages.map((p) =>
+      p.id === activePageId ? { ...p, nodes, edges } : p
+    )
+
+    // Load target page
+    const targetPage = updatedPages.find((p) => p.id === pageId)
+    if (!targetPage) return
+
+    set({
+      pages: updatedPages,
+      activePageId: pageId,
+      nodes: targetPage.nodes,
+      edges: targetPage.edges,
+      selectedNodeId: null,
+      selectedEdgeId: null,
+      past: [],
+      future: [],
+    })
+  },
+
+  getActivePageIndex: () => {
+    const { pages, activePageId } = get()
+    return pages.findIndex((p) => p.id === activePageId)
+  },
+
+  pushHistory: () => {
+    set((state) => ({
+      past: [...state.past.slice(-MAX_HISTORY), { nodes: state.nodes, edges: state.edges }],
+      future: [],
+    }))
+  },
+
+  undo: () => {
+    const { past, nodes, edges } = get()
+    if (past.length === 0) return
+    const prev = past[past.length - 1]
+    set({
+      past: past.slice(0, -1),
+      future: [{ nodes, edges }, ...get().future],
+      nodes: prev.nodes,
+      edges: prev.edges,
+      isDirty: true,
+    })
+  },
+
+  redo: () => {
+    const { future, nodes, edges } = get()
+    if (future.length === 0) return
+    const next = future[0]
+    set({
+      future: future.slice(1),
+      past: [...get().past, { nodes, edges }],
+      nodes: next.nodes,
+      edges: next.edges,
+      isDirty: true,
+    })
+  },
+
+  saveProject: async () => {
+    const state = get()
+    // Sync current page state into pages array
+    const syncedPages = state.pages.map((p) =>
+      p.id === state.activePageId ? { ...p, nodes: state.nodes, edges: state.edges } : p
+    )
+    const project: AVProject = {
+      id: state.projectId,
+      name: state.projectName,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      mode: state.mode,
+      nodes: state.nodes,
+      edges: state.edges,
+      viewport: { x: 0, y: 0, zoom: 1 },
+      layerVisibility: state.layerVisibility,
+      focusedLayer: state.focusedLayer,
+      showEdgeLabels: state.showEdgeLabels,
+      pages: syncedPages,
+      activePageId: state.activePageId,
+    }
+    await db.projects.put(project)
+    set({ pages: syncedPages, isDirty: false })
+  },
+
+  loadProject: async (id: string) => {
+    const project = await db.projects.get(id)
+    if (!project) return
+
+    // Migrate old single-page projects to pages format
+    let pages: ProjectPage[]
+    let activePageId: string
+    if (project.pages && project.pages.length > 0) {
+      pages = project.pages.map((p) => ({
+        ...p,
+        nodes: migrateNodes(p.nodes),
+        edges: migrateEdges(p.edges),
+      }))
+      activePageId = project.activePageId ?? pages[0].id
+    } else {
+      // Old format: wrap flat nodes/edges in a single page
+      const pageId = generateId()
+      pages = [{
+        id: pageId,
+        label: 'Page 1',
+        nodes: migrateNodes(project.nodes),
+        edges: migrateEdges(project.edges),
+        viewport: project.viewport ?? { x: 0, y: 0, zoom: 1 },
+      }]
+      activePageId = pageId
+    }
+
+    const activePage = pages.find((p) => p.id === activePageId) ?? pages[0]
+
+    set({
+      projectId: project.id,
+      projectName: project.name,
+      mode: project.mode,
+      pages,
+      activePageId: activePage.id,
+      nodes: activePage.nodes,
+      edges: activePage.edges,
+      layerVisibility: project.layerVisibility ?? { audio: true, video: true, network: true, power: true, 'av-over-ip': true },
+      focusedLayer: project.focusedLayer ?? null,
+      showEdgeLabels: project.showEdgeLabels ?? false,
+      isDirty: false,
+      past: [],
+      future: [],
+      selectedNodeId: null,
+    })
+  },
+
+  newProject: (name?: string) => {
+    const pageId = generateId()
+    set({
+      projectId: generateId(),
+      projectName: name ?? 'Untitled Diagram',
+      mode: 'signal-flow',
+      pages: [{ id: pageId, label: 'Page 1', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }],
+      activePageId: pageId,
+      nodes: [],
+      edges: [],
+      isDirty: false,
+      past: [],
+      future: [],
+      selectedNodeId: null,
+      layerVisibility: { audio: true, video: true, network: true, power: true, 'av-over-ip': true },
+      focusedLayer: null,
+      showEdgeLabels: false,
+    })
+  },
+
+  loadProjects: async () => {
+    return db.projects.orderBy('updatedAt').reverse().toArray()
+  },
+
+  deleteProject: async (id: string) => {
+    await db.projects.delete(id)
+  },
+
+  duplicateSelected: () => {
+    const { nodes, edges, pushHistory } = get()
+    const selected = nodes.filter((n) => n.selected)
+    if (selected.length === 0) return
+
+    pushHistory()
+    const OFFSET = 40
+    const idMap = new Map<string, string>()
+
+    const newNodes = selected.map((n) => {
+      const newId = generateId()
+      idMap.set(n.id, newId)
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        selected: true,
+        data: { ...n.data },
+      }
+    })
+
+    // Duplicate internal edges (both source and target in selection)
+    const selectedIds = new Set(selected.map((n) => n.id))
+    const newEdges = edges
+      .filter((e) => selectedIds.has(e.source) && selectedIds.has(e.target))
+      .map((e) => ({
+        ...e,
+        id: generateId(),
+        source: idMap.get(e.source) ?? e.source,
+        target: idMap.get(e.target) ?? e.target,
+        data: e.data ? { ...e.data } : undefined,
+      }))
+
+    set((state) => ({
+      nodes: [
+        ...state.nodes.map((n) => ({ ...n, selected: false })),
+        ...newNodes,
+      ],
+      edges: [...state.edges, ...newEdges],
+      isDirty: true,
+    }))
+  },
+
+  alignNodes: (axis) => {
+    const { nodes, pushHistory } = get()
+    const selected = nodes.filter((n) => n.selected && n.type !== 'group')
+    if (selected.length < 2) return
+
+    pushHistory()
+
+    if (axis === 'horizontal') {
+      // Align to average Y
+      const avgY = selected.reduce((sum, n) => sum + n.position.y, 0) / selected.length
+      set((state) => ({
+        nodes: state.nodes.map((n) =>
+          n.selected && n.type !== 'group' ? { ...n, position: { ...n.position, y: avgY } } : n
+        ),
+        isDirty: true,
+      }))
+    } else {
+      // Align to average X
+      const avgX = selected.reduce((sum, n) => sum + n.position.x, 0) / selected.length
+      set((state) => ({
+        nodes: state.nodes.map((n) =>
+          n.selected && n.type !== 'group' ? { ...n, position: { ...n.position, x: avgX } } : n
+        ),
+        isDirty: true,
+      }))
+    }
+  },
+
+  distributeNodes: (axis) => {
+    const { nodes, pushHistory } = get()
+    const selected = nodes.filter((n) => n.selected && n.type !== 'group')
+    if (selected.length < 3) return
+
+    pushHistory()
+
+    const sorted = [...selected].sort((a, b) =>
+      axis === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y
+    )
+
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const totalSpan = axis === 'horizontal'
+      ? last.position.x - first.position.x
+      : last.position.y - first.position.y
+    const step = totalSpan / (sorted.length - 1)
+
+    const posMap = new Map<string, number>()
+    sorted.forEach((n, i) => {
+      const base = axis === 'horizontal' ? first.position.x : first.position.y
+      posMap.set(n.id, base + i * step)
+    })
+
+    set((state) => ({
+      nodes: state.nodes.map((n) => {
+        if (!posMap.has(n.id)) return n
+        const val = posMap.get(n.id)!
+        return {
+          ...n,
+          position: axis === 'horizontal'
+            ? { ...n.position, x: val }
+            : { ...n.position, y: val },
+        }
+      }),
+      isDirty: true,
+    }))
+  },
+
+  updateEdgeData: (edgeId, data) => {
+    const { pushHistory } = get()
+    pushHistory()
+    set((state) => ({
+      edges: state.edges.map((e) =>
+        e.id === edgeId ? { ...e, data: { ...e.data, ...data } as AVEdgeData } : e
+      ),
+      isDirty: true,
+    }))
+  },
+
+  copySelected: () => {
+    const { nodes, edges } = get()
+    const selected = nodes.filter((n) => n.selected)
+    if (selected.length === 0) return
+    const selectedIds = new Set(selected.map((n) => n.id))
+    const relatedEdges = edges.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
+    )
+    set({
+      clipboard: {
+        nodes: selected.map((n) => ({ ...n, data: { ...n.data } })),
+        edges: relatedEdges.map((e) => ({ ...e, data: e.data ? { ...e.data } : undefined })),
+      },
+    })
+  },
+
+  pasteClipboard: () => {
+    const { clipboard, pushHistory } = get()
+    if (!clipboard || clipboard.nodes.length === 0) return
+
+    pushHistory()
+    const OFFSET = 50
+    const idMap = new Map<string, string>()
+
+    const newNodes = clipboard.nodes.map((n) => {
+      const newId = generateId()
+      idMap.set(n.id, newId)
+      return {
+        ...n,
+        id: newId,
+        position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        selected: true,
+        data: { ...n.data },
+      }
+    })
+
+    const newEdges = clipboard.edges.map((e) => ({
+      ...e,
+      id: generateId(),
+      source: idMap.get(e.source) ?? e.source,
+      target: idMap.get(e.target) ?? e.target,
+      data: e.data ? { ...e.data } : undefined,
+    }))
+
+    set((state) => ({
+      nodes: [
+        ...state.nodes.map((n) => ({ ...n, selected: false })),
+        ...newNodes,
+      ],
+      edges: [...state.edges, ...newEdges],
+      isDirty: true,
+      // Update clipboard positions so next paste offsets further
+      clipboard: {
+        nodes: clipboard.nodes.map((n) => ({
+          ...n,
+          position: { x: n.position.x + OFFSET, y: n.position.y + OFFSET },
+        })),
+        edges: clipboard.edges,
+      },
+    }))
+  },
+
+  selectAll: () => {
+    set((state) => ({
+      nodes: state.nodes.map((n) => ({ ...n, selected: true })),
+    }))
+  },
+
+  exportProjectFile: () => {
+    const state = get()
+    // Sync current page into pages array
+    const syncedPages = state.pages.map((p) =>
+      p.id === state.activePageId ? { ...p, nodes: state.nodes, edges: state.edges } : p
+    )
+    const projectData = {
+      version: 2,
+      name: state.projectName,
+      mode: state.mode,
+      nodes: state.nodes,
+      edges: state.edges,
+      pages: syncedPages,
+      activePageId: state.activePageId,
+      layerVisibility: state.layerVisibility,
+      focusedLayer: state.focusedLayer,
+      showEdgeLabels: state.showEdgeLabels,
+      exportedAt: Date.now(),
+    }
+    const json = JSON.stringify(projectData, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.download = `${state.projectName.replace(/[^a-zA-Z0-9-_ ]/g, '')}.avd`
+    link.href = url
+    link.click()
+    URL.revokeObjectURL(url)
+  },
+
+  importProjectFile: async (file: File) => {
+    const text = await file.text()
+    const data = JSON.parse(text)
+    if (!data.nodes && !data.pages) {
+      throw new Error('Invalid .avd file format')
+    }
+
+    let pages: ProjectPage[]
+    let activePageId: string
+    if (data.pages && data.pages.length > 0) {
+      pages = data.pages.map((p: ProjectPage) => ({
+        ...p,
+        nodes: migrateNodes(p.nodes),
+        edges: migrateEdges(p.edges),
+      }))
+      activePageId = data.activePageId ?? pages[0].id
+    } else {
+      const pageId = generateId()
+      pages = [{
+        id: pageId,
+        label: 'Page 1',
+        nodes: migrateNodes(data.nodes ?? []),
+        edges: migrateEdges(data.edges ?? []),
+        viewport: { x: 0, y: 0, zoom: 1 },
+      }]
+      activePageId = pageId
+    }
+
+    const activePage = pages.find((p) => p.id === activePageId) ?? pages[0]
+
+    set({
+      projectId: generateId(),
+      projectName: data.name ?? 'Imported Diagram',
+      mode: data.mode ?? 'signal-flow',
+      pages,
+      activePageId: activePage.id,
+      nodes: activePage.nodes,
+      edges: activePage.edges,
+      isDirty: true,
+      past: [],
+      future: [],
+      selectedNodeId: null,
+      selectedEdgeId: null,
+    })
+  },
+
+  setNodesAndEdges: (nodes, edges) => {
+    const { pushHistory } = get()
+    pushHistory()
+    set({ nodes, edges, isDirty: true })
+  },
+
+  groupSelectedNodes: (label = 'Group', color) => {
+    const { nodes, pushHistory } = get()
+    const selected = nodes.filter((n) => n.selected && n.type !== 'group')
+    if (selected.length < 2) return
+
+    pushHistory()
+
+    const PADDING = 30
+    const HEADER = 28
+
+    const minX = Math.min(...selected.map((n) => n.position.x)) - PADDING
+    const minY = Math.min(...selected.map((n) => n.position.y)) - HEADER - PADDING
+    const maxX = Math.max(...selected.map((n) => n.position.x + (n.measured?.width ?? 160))) + PADDING
+    const maxY = Math.max(...selected.map((n) => n.position.y + (n.measured?.height ?? 80))) + PADDING
+
+    const groupId = generateId()
+    const groupNode: Node<GroupNodeData> = {
+      id: groupId,
+      type: 'group',
+      position: { x: minX, y: minY },
+      style: { width: maxX - minX, height: maxY - minY },
+      data: { label, color },
+    }
+
+    // Make selected nodes children of the group by setting parentId and adjusting positions
+    const updatedNodes = nodes.map((n) => {
+      if (n.selected && n.type !== 'group') {
+        return {
+          ...n,
+          parentId: groupId,
+          position: {
+            x: n.position.x - minX,
+            y: n.position.y - minY,
+          },
+          selected: false,
+          expandParent: true,
+        }
+      }
+      return n
+    })
+
+    set({
+      nodes: [groupNode, ...updatedNodes] as Node<AVNodeData>[],
+      isDirty: true,
+    })
+  },
+
+  ungroupNodes: (groupId: string) => {
+    const { nodes, pushHistory } = get()
+    const groupNode = nodes.find((n) => n.id === groupId)
+    if (!groupNode) return
+
+    pushHistory()
+
+    const updatedNodes = nodes
+      .filter((n) => n.id !== groupId)
+      .map((n) => {
+        if (n.parentId === groupId) {
+          return {
+            ...n,
+            parentId: undefined,
+            position: {
+              x: n.position.x + groupNode.position.x,
+              y: n.position.y + groupNode.position.y,
+            },
+            expandParent: undefined,
+          }
+        }
+        return n
+      })
+
+    set({
+      nodes: updatedNodes,
+      isDirty: true,
+    })
+  },
+
+  toggleLayerVisibility: (domain: SignalDomain) => {
+    set((state) => ({
+      layerVisibility: {
+        ...state.layerVisibility,
+        [domain]: !state.layerVisibility[domain],
+      },
+    }))
+  },
+
+  setFocusedLayer: (domain: SignalDomain | null) => {
+    set({ focusedLayer: domain })
+  },
+
+  setShowEdgeLabels: (show: boolean) => {
+    set({ showEdgeLabels: show })
+  },
+
+  setShowProductImages: (show) => set({ showProductImages: show }),
+
+  // Signal chain analysis
+  runSignalChainAnalysis: () => {
+    const { nodes, edges } = get()
+    const chains = traceSignalChains(nodes, edges)
+    const issues = analyzeChainsDeterministic(chains)
+    set({ signalChains: chains, chainIssues: issues, llmIssues: [], llmAnalysisSummary: null })
+  },
+
+  runLLMAnalysis: async (chainId: string) => {
+    const { signalChains } = get()
+    const chain = signalChains.find((c) => c.id === chainId)
+    if (!chain) return
+
+    set({ isAnalyzing: true })
+    try {
+      const result = await analyzeChainWithLLM(chain)
+      set({
+        llmIssues: result.issues.map((i) => ({
+          ...i,
+          severity: i.severity as 'error' | 'warning' | 'info',
+        })),
+        llmAnalysisSummary: result.summary,
+        isAnalyzing: false,
+      })
+    } catch {
+      set({
+        llmAnalysisSummary: 'LLM analysis failed — is the backend running?',
+        isAnalyzing: false,
+      })
+    }
+  },
+
+  clearChainAnalysis: () => {
+    set({ signalChains: [], chainIssues: [], llmIssues: [], isAnalyzing: false, llmAnalysisSummary: null })
+  },
+}))

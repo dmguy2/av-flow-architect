@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+undetected-chromedriver
+beautifulsoup4
+selenium
+requests
+setuptools
