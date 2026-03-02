@@ -46,7 +46,7 @@ const SINK_TYPES = new Set([
 
 /**
  * Extract port ID from a React Flow handle ID.
- * Handle IDs have format: "portId-source" or "portId-target"
+ * Handle IDs are plain port IDs. Legacy edges may still use "portId-source" or "portId-target" suffixes.
  */
 function portIdFromHandle(handle: string | null | undefined): string {
   if (!handle) return ''

@@ -61,14 +61,8 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
     const allHandles = [
       ...inputPorts.map((p: AVPort) => ({ id: p.id, type: 'target' as const, position: Position.Left })),
       ...outputPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Right })),
-      ...bidiPorts.flatMap((p: AVPort) => [
-        { id: `${p.id}-target`, type: 'target' as const, position: Position.Left },
-        { id: `${p.id}-source`, type: 'source' as const, position: Position.Right },
-      ]),
-      ...undefinedPorts.flatMap((p: AVPort) => [
-        { id: `${p.id}-target`, type: 'target' as const, position: Position.Left },
-        { id: `${p.id}-source`, type: 'source' as const, position: Position.Right },
-      ]),
+      ...bidiPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Left, bidi: true })),
+      ...undefinedPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Left, bidi: true })),
     ]
     const handleStyle = {
       opacity: 0,
@@ -117,6 +111,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
             type={h.type}
             position={h.position}
             id={h.id}
+            isConnectableEnd={'bidi' in h ? true : undefined}
             style={{
               ...handleStyle,
               top: `${((idx + 1) / (allHandles.length + 1)) * 100}%`,
@@ -270,67 +265,41 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + idx) * 24
           const color = getSignalColor(port.domain)
           return (
-            <div key={port.id}>
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={`${port.id}-target`}
-                style={{
-                  top: topOffset,
-                  background: color,
-                  width: 9,
-                  height: 9,
-                  border: '2px solid var(--color-card)',
-                  boxShadow: `0 0 4px ${color}50`,
-                }}
-              />
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={`${port.id}-source`}
-                style={{
-                  top: topOffset,
-                  background: color,
-                  width: 9,
-                  height: 9,
-                  border: '2px solid var(--color-card)',
-                  boxShadow: `0 0 4px ${color}50`,
-                }}
-              />
-            </div>
+            <Handle
+              key={port.id}
+              type="source"
+              position={Position.Left}
+              id={port.id}
+              isConnectableEnd
+              style={{
+                top: topOffset,
+                background: color,
+                width: 9,
+                height: 9,
+                border: '2px solid var(--color-card)',
+                boxShadow: `0 0 4px ${color}50`,
+              }}
+            />
           )
         })}
         {undefinedPorts.map((port: AVPort, idx: number) => {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + bidiPorts.length + idx) * 24
           return (
-            <div key={port.id}>
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={`${port.id}-target`}
-                style={{
-                  top: topOffset,
-                  background: '#6B7280',
-                  width: 9,
-                  height: 9,
-                  border: '2px dashed var(--color-card)',
-                  boxShadow: '0 0 4px #6B728050',
-                }}
-              />
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={`${port.id}-source`}
-                style={{
-                  top: topOffset,
-                  background: '#6B7280',
-                  width: 9,
-                  height: 9,
-                  border: '2px dashed var(--color-card)',
-                  boxShadow: '0 0 4px #6B728050',
-                }}
-              />
-            </div>
+            <Handle
+              key={port.id}
+              type="source"
+              position={Position.Left}
+              id={port.id}
+              isConnectableEnd
+              style={{
+                top: topOffset,
+                background: '#6B7280',
+                width: 9,
+                height: 9,
+                border: '2px dashed var(--color-card)',
+                boxShadow: '0 0 4px #6B728050',
+              }}
+            />
           )
         })}
       </div>

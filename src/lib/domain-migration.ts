@@ -34,9 +34,17 @@ export function migrateNodes(nodes: Node<AVNodeData>[]): Node<AVNodeData>[] {
 
 export function migrateEdges(edges: Edge<AVEdgeData>[]): Edge<AVEdgeData>[] {
   return edges.map((edge) => {
-    if (!edge.data) return edge
-    return {
+    // Strip old bidi handle suffixes (-target/-source) so edges match single-handle IDs
+    const sourceHandle = edge.sourceHandle?.replace(/-(?:target|source)$/, '') ?? edge.sourceHandle
+    const targetHandle = edge.targetHandle?.replace(/-(?:target|source)$/, '') ?? edge.targetHandle
+    const migrated = {
       ...edge,
+      sourceHandle,
+      targetHandle,
+    }
+    if (!edge.data) return migrated
+    return {
+      ...migrated,
       data: {
         ...edge.data,
         domain: migrateDomain(edge.data.domain, edge.data.connector),

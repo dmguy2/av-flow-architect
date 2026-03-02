@@ -18,8 +18,9 @@ function OffsheetConnectorNode({ data, selected, id }: NodeProps<OffsheetConnect
   }, [id, updateNodeInternals])
   const setActivePage = useDiagramStore((s) => s.setActivePage)
 
-  const inputPorts = data.ports.filter((p: AVPort) => p.direction === 'input' || p.direction === 'bidirectional' || p.direction === 'undefined')
-  const outputPorts = data.ports.filter((p: AVPort) => p.direction === 'output' || p.direction === 'bidirectional' || p.direction === 'undefined')
+  const inputPorts = data.ports.filter((p: AVPort) => p.direction === 'input')
+  const outputPorts = data.ports.filter((p: AVPort) => p.direction === 'output')
+  const bidiPorts = data.ports.filter((p: AVPort) => p.direction === 'bidirectional' || p.direction === 'undefined')
 
   const targetPageId = (data as AVNodeData & { targetPageId?: string }).targetPageId
   const targetPage = targetPageId ? pages.find((p) => p.id === targetPageId) : undefined
@@ -58,7 +59,7 @@ function OffsheetConnectorNode({ data, selected, id }: NodeProps<OffsheetConnect
       </div>
 
       {/* Ports */}
-      <div className="relative px-1 py-1" style={{ minHeight: Math.max(inputPorts.length, outputPorts.length, 1) * 24 }}>
+      <div className="relative px-1 py-1" style={{ minHeight: Math.max(inputPorts.length, outputPorts.length, 1) * 24 + bidiPorts.length * 24 }}>
         {inputPorts.map((port: AVPort, idx: number) => {
           const topOffset = 12 + idx * 24
           return (
@@ -103,6 +104,33 @@ function OffsheetConnectorNode({ data, selected, id }: NodeProps<OffsheetConnect
               />
               <div
                 className="absolute right-3 text-[10px] text-muted-foreground whitespace-nowrap text-right"
+                style={{ top: topOffset - 7 }}
+              >
+                {port.label}
+              </div>
+            </div>
+          )
+        })}
+
+        {bidiPorts.map((port: AVPort, idx: number) => {
+          const topOffset = 12 + (Math.max(inputPorts.length, outputPorts.length) + idx) * 24
+          return (
+            <div key={port.id}>
+              <Handle
+                type="source"
+                position={Position.Left}
+                id={port.id}
+                isConnectableEnd
+                style={{
+                  top: topOffset,
+                  background: getSignalColor(port.domain),
+                  width: 10,
+                  height: 10,
+                  border: '2px solid white',
+                }}
+              />
+              <div
+                className="absolute left-3 text-[10px] text-muted-foreground whitespace-nowrap"
                 style={{ top: topOffset - 7 }}
               >
                 {port.label}
