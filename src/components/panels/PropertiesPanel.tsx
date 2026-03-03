@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import { getSignalColor, SIGNAL_LABELS } from '@/lib/signal-colors'
 import { getComponentDef } from '@/data/component-definitions'
 import { getIcon } from '@/lib/icons'
 import { generateId } from '@/lib/utils'
-import type { AVPort, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole } from '@/types/av'
+import type { AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole } from '@/types/av'
 import { CONNECTOR_VARIANTS, VARIANT_LABELS } from '@/lib/connector-variants'
 
 export default function PropertiesPanel() {
@@ -178,7 +178,7 @@ export default function PropertiesPanel() {
     ethernet: 'Ethernet', dante: 'Dante', usb: 'USB', speakon: 'Speakon',
     powercon: 'powerCON', dmx: 'DMX', fiber: 'Fiber', aes50: 'AES50', ndi: 'NDI',
     wifi: 'Wi-Fi', thunderbolt: 'Thunderbolt', db9: 'DB-9', bnc: 'BNC',
-    displayport: 'DisplayPort',
+    displayport: 'DisplayPort', sd: 'SD Card',
   }
 
   const addPort = (direction: PortDirection) => {
@@ -452,6 +452,20 @@ export default function PropertiesPanel() {
             </div>
           )}
 
+          {/* Product Info & Specs */}
+          {(def?.images?.length || def?.specs || def?.bhUrl || data.images || data.specs || data.bhUrl) && (
+            <>
+              <Separator />
+              <ProductInfo
+                def={def}
+                image={data.image as string | undefined}
+                nodeImages={data.images as string[] | undefined}
+                nodeSpecs={data.specs as Record<string, Record<string, string>> | undefined}
+                nodeBhUrl={data.bhUrl as string | undefined}
+              />
+            </>
+          )}
+
           <Separator />
 
           {/* Delete */}
@@ -466,6 +480,115 @@ export default function PropertiesPanel() {
           </Button>
         </div>
       </ScrollArea>
+    </div>
+  )
+}
+
+/* ── Product Info sub-component ── */
+
+function SpecSection({ title, entries }: { title: string; entries: Record<string, string> }) {
+  const [open, setOpen] = useState(false)
+  const keys = Object.keys(entries)
+  if (keys.length === 0) return null
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1 w-full text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors py-1"
+      >
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        {title}
+        <span className="font-normal text-[9px] ml-auto tabular-nums">{keys.length}</span>
+      </button>
+      {open && (
+        <div className="space-y-0.5 ml-4 mb-2">
+          {keys.map((key) => (
+            <div key={key} className="grid grid-cols-[1fr_1fr] gap-1 text-[10px] leading-snug">
+              <span className="text-muted-foreground truncate" title={key}>{key}</span>
+              <span className="text-foreground break-words">{entries[key]}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProductInfo({ def, image, nodeImages, nodeSpecs, nodeBhUrl }: {
+  def?: AVComponentDef
+  image?: string
+  nodeImages?: string[]
+  nodeSpecs?: Record<string, Record<string, string>>
+  nodeBhUrl?: string
+}) {
+  const [imgIdx, setImgIdx] = useState(0)
+  const images = def?.images ?? nodeImages ?? []
+  const displayImage = image || images[imgIdx]
+  const specs = def?.specs ?? nodeSpecs
+  const bhUrl = def?.bhUrl ?? nodeBhUrl
+  const label = def?.label ?? 'Product'
+
+  return (
+    <div className="space-y-3">
+      {/* Product image */}
+      {(displayImage || images.length > 0) && (
+        <div className="space-y-1.5">
+          <Label className="text-xs flex items-center gap-1">
+            <Image className="w-3 h-3" />
+            Product Image
+          </Label>
+          {displayImage && (
+            <div className="rounded-md border border-border overflow-hidden bg-white">
+              <img
+                src={displayImage}
+                alt={label}
+                className="w-full h-auto object-contain max-h-48"
+              />
+            </div>
+          )}
+          {images.length > 1 && (
+            <div className="flex gap-1 overflow-x-auto pb-1">
+              {images.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => setImgIdx(i)}
+                  className={`shrink-0 w-10 h-10 rounded border overflow-hidden bg-white ${
+                    i === imgIdx ? 'border-primary ring-1 ring-primary' : 'border-border'
+                  }`}
+                >
+                  <img src={img} alt="" className="w-full h-full object-contain" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Specs */}
+      {specs && Object.keys(specs).length > 0 && (
+        <div className="space-y-0.5">
+          <Label className="text-xs">Specifications</Label>
+          <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5">
+            {Object.entries(specs).map(([category, entries]) => (
+              <SpecSection key={category} title={category} entries={entries} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* B&H Link */}
+      {bhUrl && (
+        <a
+          href={bhUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-[10px] text-primary hover:underline"
+        >
+          <ExternalLink className="w-3 h-3" />
+          View on B&H Photo
+        </a>
+      )}
     </div>
   )
 }

@@ -71,7 +71,7 @@ export function inferCategory(name: string): import('@/types/av').ComponentCateg
   if (/mixer|speaker|amplifier|microphone|headphone|audio|xlr|dante|dsp/i.test(n)) return 'audio'
   if (/camera|monitor|switcher|hdmi|sdi|projector|display|video/i.test(n)) return 'video'
   if (/light|dmx|console|fixture|led|wash|spot|moving head/i.test(n)) return 'lighting'
-  if (/switch|router|network|rack|power|ups|cable/i.test(n)) return 'infrastructure'
+  if (/switch|router|network|rack|power|ups|cable|adapter|hub|dock/i.test(n)) return 'infrastructure'
   return 'video'
 }
 

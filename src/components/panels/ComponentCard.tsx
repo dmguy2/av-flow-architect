@@ -32,6 +32,12 @@ function ComponentCard({ def, showImage, deletable, onEdit }: ComponentCardProps
   const hoverTimer = useRef<number | null>(null)
 
   const onDragStart = (event: React.DragEvent) => {
+    // Dismiss specs tooltip so it doesn't appear in the drag ghost
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current)
+      hoverTimer.current = null
+    }
+    setShowSpecs(false)
     event.dataTransfer.setData('application/av-component', def.type)
     event.dataTransfer.effectAllowed = 'move'
   }

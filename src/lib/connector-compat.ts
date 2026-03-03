@@ -29,7 +29,7 @@ const CONNECTOR_COMPAT: Record<string, ConnectorCompatResult> = {
 
   // Network / data cross-connector
   'ethernet|usb': { compat: 'active-converter', note: 'USB Ethernet adapter' },
-  'thunderbolt|usb': { compat: 'passive-adapter', note: 'USB-C/Thunderbolt compatible' },
+  'thunderbolt|usb': { compat: 'direct', note: 'USB-C/Thunderbolt share the same connector' },
   'ethernet|thunderbolt': { compat: 'active-converter', note: 'Thunderbolt Ethernet adapter' },
 }
 

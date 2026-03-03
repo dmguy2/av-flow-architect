@@ -22,6 +22,7 @@ export type ConnectorType =
   | 'db9'
   | 'bnc'
   | 'displayport'
+  | 'sd'
 
 export type ConnectorVariant =
   // XLR variants
@@ -48,6 +49,8 @@ export type ConnectorVariant =
   | 'bnc-reference' | 'bnc-composite' | 'bnc-wordclock'
   // DisplayPort variants
   | 'displayport-full' | 'displayport-mini'
+  // SD card variants
+  | 'sd-full' | 'sd-micro' | 'sd-cfast' | 'sd-cfexpress'
 
 export type PortDirection = 'input' | 'output' | 'bidirectional' | 'undefined'
 

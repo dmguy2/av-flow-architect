@@ -272,6 +272,7 @@ export default function CustomComponentDialog({ onComponentCreated }: Props) {
                     <option value="powercon">powerCON</option>
                     <option value="dmx">DMX</option>
                     <option value="fiber">Fiber</option>
+                    <option value="sd">SD Card</option>
                   </select>
                   <Button size="icon" variant="ghost" className="h-5 w-5 shrink-0" onClick={() => removePort(idx)}>
                     <Minus className="w-3 h-3" />

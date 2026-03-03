@@ -8,6 +8,8 @@ import {
   type NodeTypes,
   type EdgeTypes,
   type OnSelectionChangeFunc,
+  type NodeChange,
+  type EdgeChange,
 } from '@xyflow/react'
 import SignalFlowNode from './SignalFlowNode'
 import PhysicalLayoutNode from './PhysicalLayoutNode'
@@ -48,6 +50,47 @@ export default function AVCanvas() {
     setSelectedEdge,
     deleteSelected,
   } = useDiagramStore()
+
+  // Wrap onNodesChange to detect selection changes
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes)
+      const selectionChange = changes.find(
+        (c) => c.type === 'select'
+      ) as (NodeChange & { type: 'select'; id: string; selected: boolean }) | undefined
+      if (selectionChange) {
+        if (selectionChange.selected) {
+          setSelectedNode(selectionChange.id)
+        } else {
+          // Only clear if no other node is selected
+          const otherSelected = changes.find(
+            (c) => c.type === 'select' && 'selected' in c && c.selected && c.id !== selectionChange.id
+          )
+          if (!otherSelected) {
+            setSelectedNode(null)
+          }
+        }
+      }
+    },
+    [onNodesChange, setSelectedNode]
+  )
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      onEdgesChange(changes)
+      const selectionChange = changes.find(
+        (c) => c.type === 'select'
+      ) as (EdgeChange & { type: 'select'; id: string; selected: boolean }) | undefined
+      if (selectionChange) {
+        if (selectionChange.selected) {
+          setSelectedEdge(selectionChange.id)
+        } else {
+          setSelectedEdge(null)
+        }
+      }
+    },
+    [onEdgesChange, setSelectedEdge]
+  )
 
   // Sort edges by z-order: power at bottom, av-over-ip on top
   const sortedEdges = useMemo(() => {
@@ -108,6 +151,9 @@ export default function AVCanvas() {
           ...(def.powerDraw && { powerDraw: def.powerDraw }),
           ...(def.deviceRole && { deviceRole: def.deviceRole }),
           ...(def.images?.[0] && { image: def.images[0] }),
+          ...(def.images && { images: def.images }),
+          ...(def.specs && { specs: def.specs }),
+          ...(def.bhUrl && { bhUrl: def.bhUrl }),
         },
       }
 
@@ -131,6 +177,25 @@ export default function AVCanvas() {
     },
     [setSelectedNode, setSelectedEdge]
   )
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      setSelectedNode(node.id)
+    },
+    [setSelectedNode]
+  )
+
+  const onEdgeClick = useCallback(
+    (_event: React.MouseEvent, edge: { id: string }) => {
+      setSelectedEdge(edge.id)
+    },
+    [setSelectedEdge]
+  )
+
+  const onPaneClick = useCallback(() => {
+    setSelectedNode(null)
+    setSelectedEdge(null)
+  }, [setSelectedNode, setSelectedEdge])
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -165,10 +230,13 @@ export default function AVCanvas() {
       <ReactFlow
         nodes={nodes}
         edges={sortedEdges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
+        onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}

@@ -22,6 +22,7 @@ export const CONNECTOR_DOMAIN_MAP: Record<ConnectorType, SignalDomain> = {
   db9: 'network',
   bnc: 'video',
   displayport: 'video',
+  sd: 'network',
 }
 
 export interface ValidationResult {
@@ -114,7 +115,9 @@ export function validateConnection(
     if (compatResult.compat === 'active-converter') {
       return { tier: 'warn', message: `Active converter needed: ${compatResult.note}` }
     }
-    // 'direct' falls through to allow
+    if (compatResult.compat === 'direct') {
+      return { tier: 'allow' }
+    }
   }
 
   // ── Warn Rules ───────────────────────────────────────────────

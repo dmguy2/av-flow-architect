@@ -14,6 +14,7 @@ export const CONNECTOR_VARIANTS: Record<ConnectorType, ConnectorVariant[]> = {
   db9: ['db9-rs422', 'db9-rs232'],
   bnc: ['bnc-reference', 'bnc-composite', 'bnc-wordclock'],
   displayport: ['displayport-full', 'displayport-mini'],
+  sd: ['sd-full', 'sd-micro', 'sd-cfast', 'sd-cfexpress'],
   // No variants
   rca: [],
   dante: [],
@@ -58,6 +59,10 @@ export const VARIANT_LABELS: Record<ConnectorVariant, string> = {
   'bnc-wordclock': 'Word Clock',
   'displayport-full': 'Full-Size',
   'displayport-mini': 'Mini',
+  'sd-full': 'SD/SDHC/SDXC',
+  'sd-micro': 'microSD',
+  'sd-cfast': 'CFast',
+  'sd-cfexpress': 'CFexpress',
 }
 
 type VariantCompat = 'same' | 'compatible' | 'incompatible'

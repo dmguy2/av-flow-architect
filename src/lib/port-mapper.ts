@@ -31,6 +31,8 @@ const CONNECTOR_RULES: ConnectorRule[] = [
   { pattern: /\bwi-?fi|wireless|802\.11\b/i, connector: 'wifi', domain: 'network' },
   { pattern: /\bethernet|rj.?45\b/i, connector: 'ethernet', domain: 'network' },
   { pattern: /\bfiber|sfp\b/i, connector: 'fiber', domain: 'network' },
+  { pattern: /\bmicrosd|micro.?sd\b/i, connector: 'sd', domain: 'network' },
+  { pattern: /\bsd(?:hc|xc)?(?:\s|$)|cfast|cfexpress|compactflash\b/i, connector: 'sd', domain: 'network' },
   { pattern: /\busb\b/i, connector: 'usb', domain: 'video' },
   { pattern: /\bpowercon|iec\b/i, connector: 'powercon', domain: 'power' },
 ]

@@ -61,8 +61,14 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
     const allHandles = [
       ...inputPorts.map((p: AVPort) => ({ id: p.id, type: 'target' as const, position: Position.Left })),
       ...outputPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Right })),
-      ...bidiPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Left, bidi: true })),
-      ...undefinedPorts.map((p: AVPort) => ({ id: p.id, type: 'source' as const, position: Position.Left, bidi: true })),
+      ...bidiPorts.flatMap((p: AVPort) => [
+        { id: `${p.id}-source`, type: 'source' as const, position: Position.Left },
+        { id: `${p.id}-target`, type: 'target' as const, position: Position.Left },
+      ]),
+      ...undefinedPorts.flatMap((p: AVPort) => [
+        { id: `${p.id}-source`, type: 'source' as const, position: Position.Left },
+        { id: `${p.id}-target`, type: 'target' as const, position: Position.Left },
+      ]),
     ]
     const handleStyle = {
       opacity: 0,
@@ -111,7 +117,6 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
             type={h.type}
             position={h.position}
             id={h.id}
-            isConnectableEnd={'bidi' in h ? true : undefined}
             style={{
               ...handleStyle,
               top: `${((idx + 1) / (allHandles.length + 1)) * 100}%`,
@@ -208,14 +213,14 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           )
         })}
         {bidiPorts.map((port: AVPort) => (
-          <div key={port.id} className="flex items-center justify-center h-6 pl-3 pr-3">
+          <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
             <span className="text-[10px] text-muted-foreground whitespace-nowrap">
               ↔ {port.label}
             </span>
           </div>
         ))}
         {undefinedPorts.map((port: AVPort) => (
-          <div key={port.id} className="flex items-center justify-center h-6 pl-3 pr-3">
+          <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
             <span className="text-[10px] text-muted-foreground whitespace-nowrap italic">
               ? {port.label}
             </span>
@@ -265,41 +270,67 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + idx) * 24
           const color = getSignalColor(port.domain)
           return (
-            <Handle
-              key={port.id}
-              type="source"
-              position={Position.Left}
-              id={port.id}
-              isConnectableEnd
-              style={{
-                top: topOffset,
-                background: color,
-                width: 9,
-                height: 9,
-                border: '2px solid var(--color-card)',
-                boxShadow: `0 0 4px ${color}50`,
-              }}
-            />
+            <span key={port.id}>
+              <Handle
+                type="source"
+                position={Position.Left}
+                id={`${port.id}-source`}
+                style={{
+                  top: topOffset,
+                  background: color,
+                  width: 9,
+                  height: 9,
+                  border: '2px solid var(--color-card)',
+                  boxShadow: `0 0 4px ${color}50`,
+                }}
+              />
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`${port.id}-target`}
+                style={{
+                  top: topOffset,
+                  background: color,
+                  width: 9,
+                  height: 9,
+                  border: '2px solid var(--color-card)',
+                  boxShadow: `0 0 4px ${color}50`,
+                }}
+              />
+            </span>
           )
         })}
         {undefinedPorts.map((port: AVPort, idx: number) => {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + bidiPorts.length + idx) * 24
           return (
-            <Handle
-              key={port.id}
-              type="source"
-              position={Position.Left}
-              id={port.id}
-              isConnectableEnd
-              style={{
-                top: topOffset,
-                background: '#6B7280',
-                width: 9,
-                height: 9,
-                border: '2px dashed var(--color-card)',
-                boxShadow: '0 0 4px #6B728050',
-              }}
-            />
+            <span key={port.id}>
+              <Handle
+                type="source"
+                position={Position.Left}
+                id={`${port.id}-source`}
+                style={{
+                  top: topOffset,
+                  background: '#6B7280',
+                  width: 9,
+                  height: 9,
+                  border: '2px dashed var(--color-card)',
+                  boxShadow: '0 0 4px #6B728050',
+                }}
+              />
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`${port.id}-target`}
+                style={{
+                  top: topOffset,
+                  background: '#6B7280',
+                  width: 9,
+                  height: 9,
+                  border: '2px dashed var(--color-card)',
+                  boxShadow: '0 0 4px #6B728050',
+                }}
+              />
+            </span>
           )
         })}
       </div>

@@ -277,6 +277,7 @@ export default function EditComponentDialog({ open, onOpenChange, def }: Props) 
                     <option value="db9">DB-9</option>
                     <option value="bnc">BNC</option>
                     <option value="displayport">DisplayPort</option>
+                    <option value="sd">SD Card</option>
                   </select>
                   <Button
                     size="icon"

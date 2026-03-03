@@ -107,7 +107,7 @@ CRITICAL RULES:
 - Include expansion slots and option card slots if explicitly listed.
 
 CONNECTOR MAPPING (use these exact values):
-- connector must be one of: xlr, trs, rca, hdmi, sdi, ethernet, dante, usb, speakon, powercon, dmx, fiber, aes50, ndi, wifi, thunderbolt, db9, bnc, displayport
+- connector must be one of: xlr, trs, rca, hdmi, sdi, ethernet, dante, usb, speakon, powercon, dmx, fiber, aes50, ndi, wifi, thunderbolt, db9, bnc, displayport, sd
 - 1/4 inch and 3.5mm and 1/8 inch jacks = "trs"
 - etherCON and RJ45 = "ethernet"
 - BNC for SDI = "sdi" (NOT "bnc")
@@ -120,6 +120,10 @@ CONNECTOR MAPPING (use these exact values):
 - DisplayPort, Mini DisplayPort = "displayport"
 - powerCON and IEC = "powercon"
 - Expansion/option card slots = "ethernet" with domain "network"
+- SD, SDHC, SDXC card slots = "sd" with variant "sd-full"
+- microSD, microSDHC, microSDXC = "sd" with variant "sd-micro"
+- CFast = "sd" with variant "sd-cfast"
+- CFexpress = "sd" with variant "sd-cfexpress"
 
 IMPORTANT for adapters and cables:
 - Specs with "Connector 1", "Connector 2" etc. describe SEPARATE physical connectors. Each one is its own port with its own connector type.
@@ -139,6 +143,7 @@ VARIANT MAPPING (optional - include ONLY when the specs explicitly state the phy
 - DB9: "db9-rs422", "db9-rs232"
 - BNC: "bnc-reference", "bnc-composite", "bnc-wordclock"
 - DisplayPort: "displayport-full", "displayport-mini"
+- SD: "sd-full" (for SD/SDHC/SDXC), "sd-micro" (for microSD/microSDHC/microSDXC), "sd-cfast", "sd-cfexpress"
 - If the specs don't mention a specific subtype, OMIT the variant field entirely.
 
 DOMAIN MAPPING (use these exact values):
@@ -146,12 +151,12 @@ DOMAIN MAPPING (use these exact values):
 - XLR, TRS, RCA, speakon = "audio"
 - HDMI, SDI, BNC (reference/composite/component), DisplayPort = "video"
 - NDI = "video"
-- Ethernet, RJ45, etherCON, USB, Thunderbolt, DB9 (RS-422/RS-232), expansion slots = "network"
+- Ethernet, RJ45, etherCON, USB, Thunderbolt, DB9 (RS-422/RS-232), expansion slots, SD card readers = "network"
 - powerCON, IEC = "power"
 - Dante, AES50 = "av-over-ip"
 
 DIRECTION: input, output, or bidirectional
-- Ethernet, USB, Thunderbolt, expansion slots = "bidirectional"
+- Ethernet, USB, Thunderbolt, SD card readers, expansion slots = "bidirectional"
 - Power inputs = "input"
 - If the port name/specs explicitly say "Input" (e.g. "HDMI Input"), use "input"
 - If the port name/specs explicitly say "Output" (e.g. "SDI Output"), use "output"
@@ -175,42 +180,75 @@ def _filter_io_categories(specs: dict) -> dict:
     Filter spec categories to only I/O-relevant ones.
     Prefers 'Connectivity' over 'Key Specs' to avoid duplicates.
     Drops categories like Signal Processing, Performance, Physical, etc.
+    When multiple categories have overlapping keys, keeps the most comprehensive one.
+    Filters individual entries within categories to remove noise.
     """
     io_keywords = [
         "connectivity", "input", "output", "i/o", "interface",
-        "connection", "power", "expansion",
+        "connection", "power", "expansion", "card reader",
     ]
 
     # Check if a dedicated Connectivity section exists
     has_connectivity = any("connectivity" in cat.lower() for cat in specs)
+
+    # Skip categories that never contain ports
+    skip_cats = ["signal processing", "performance", "digital audio",
+                 "physical", "packaging", "compatibility", "recording"]
+
+    # Keys that should be dropped from categories passed to the LLM
+    noise_keys = re.compile(
+        r'\b(?:dimension|weight|enclosure|material|compatibility|os\s|operating\s*system|'
+        r'cable\s*length|lock\s*slot|wireless\s*charging)\b',
+        re.IGNORECASE,
+    )
+
+    # Keys that indicate port information
+    port_keys = ["input", "output", "i/o", "port", "connector",
+                  "usb", "hdmi", "sdi", "ethernet", "expansion",
+                  "card reader", "host connection", "thunderbolt", "displayport"]
 
     filtered: dict = {}
     for category, items in specs.items():
         cat_lower = category.lower()
 
         # Skip 'Key Specs' / 'Mixer' if we have a dedicated Connectivity section
-        # (they contain duplicate I/O info mixed with non-port data)
         if has_connectivity and cat_lower in ("key specs", "mixer"):
             continue
 
-        # Skip categories that never contain ports
-        skip = ["signal processing", "performance", "digital audio",
-                "physical", "packaging", "compatibility", "recording"]
-        if any(s in cat_lower for s in skip):
+        if any(s in cat_lower for s in skip_cats):
             continue
 
-        # Include if category name suggests I/O
-        if any(kw in cat_lower for kw in io_keywords):
-            filtered[category] = items
-            continue
+        # Determine if this category contains I/O info
+        is_io_cat = any(kw in cat_lower for kw in io_keywords)
+        has_port_keys = any(any(pk in k.lower() for pk in port_keys) for k in items)
 
-        # Include if any spec key looks like a port
-        port_keys = ["input", "output", "i/o", "port", "connector",
-                      "usb", "hdmi", "sdi", "ethernet", "expansion"]
-        if any(any(pk in k.lower() for pk in port_keys) for k in items):
-            filtered[category] = items
+        if is_io_cat or has_port_keys:
+            # Filter out noise entries within the category
+            clean_items = {
+                k: v for k, v in items.items()
+                if not noise_keys.search(k)
+            }
+            if clean_items:
+                filtered[category] = clean_items
 
-    return filtered if filtered else specs
+    if not filtered:
+        return specs
+
+    # Deduplicate: if "Key Specs" and "General Specs" both made it through
+    # and share overlapping keys, keep only the more comprehensive one
+    cats = list(filtered.keys())
+    if len(cats) == 2:
+        items_a = set(filtered[cats[0]].keys())
+        items_b = set(filtered[cats[1]].keys())
+        overlap = items_a & items_b
+        if overlap and len(overlap) >= min(len(items_a), len(items_b)) * 0.5:
+            # Keep whichever has more entries
+            if len(items_b) >= len(items_a):
+                del filtered[cats[0]]
+            else:
+                del filtered[cats[1]]
+
+    return filtered
 
 
 def _repair_json(text: str) -> str:
@@ -256,6 +294,8 @@ CONNECTOR_EVIDENCE = {
     "db9": ["db-9", "de-9", "db9", "de9", "rs-422", "rs422", "rs-232", "rs232", "serial control", "machine control"],
     "bnc": ["bnc", "reference", "genlock", "blackburst", "tri-level", "word clock", "wordclock", "composite", "component"],
     "displayport": ["displayport", "display port", "dp 1.", "mini dp", "mini displayport"],
+    "sd": ["sd", "sdhc", "sdxc", "microsd", "micro sd", "card reader", "memory card",
+           "cfast", "cfexpress", "compactflash", "compact flash"],
 }
 
 # Valid variant values per connector type (for LLM output validation)
@@ -272,6 +312,7 @@ VALID_VARIANTS = {
     "db9": {"db9-rs422", "db9-rs232"},
     "bnc": {"bnc-reference", "bnc-composite", "bnc-wordclock"},
     "displayport": {"displayport-full", "displayport-mini"},
+    "sd": {"sd-full", "sd-micro", "sd-cfast", "sd-cfexpress"},
 }
 
 # Evidence keywords for variant detection
@@ -308,6 +349,10 @@ VARIANT_EVIDENCE = {
     "bnc-wordclock": ["word clock", "wordclock"],
     "displayport-full": ["displayport", "display port", "full-size displayport"],
     "displayport-mini": ["mini displayport", "mini dp", "mdp"],
+    "sd-full": ["sdhc", "sdxc", "sd card", "full-size sd"],
+    "sd-micro": ["microsdhc", "microsdxc", "microsd", "micro sd", "micro-sd"],
+    "sd-cfast": ["cfast"],
+    "sd-cfexpress": ["cfexpress"],
 }
 
 
@@ -347,6 +392,16 @@ CONNECTOR_TYPE_PATTERNS: list[tuple[str, dict]] = [
     ("bnc", {"connector": "bnc", "domain": "video"}),
     ("fiber", {"connector": "fiber", "domain": "network"}),
     ("optical", {"connector": "fiber", "domain": "network"}),
+    # SD card readers (most specific first)
+    ("microsdhc", {"connector": "sd", "variant": "sd-micro", "domain": "network"}),
+    ("microsdxc", {"connector": "sd", "variant": "sd-micro", "domain": "network"}),
+    ("microsd", {"connector": "sd", "variant": "sd-micro", "domain": "network"}),
+    ("micro sd", {"connector": "sd", "variant": "sd-micro", "domain": "network"}),
+    ("cfexpress", {"connector": "sd", "variant": "sd-cfexpress", "domain": "network"}),
+    ("cfast", {"connector": "sd", "variant": "sd-cfast", "domain": "network"}),
+    ("sdhc", {"connector": "sd", "variant": "sd-full", "domain": "network"}),
+    ("sdxc", {"connector": "sd", "variant": "sd-full", "domain": "network"}),
+    ("sd card", {"connector": "sd", "variant": "sd-full", "domain": "network"}),
     ("usb", {"connector": "usb", "domain": "network"}),  # generic USB last
 ]
 
@@ -465,6 +520,163 @@ def _extract_spec_connectors(specs: dict, product_name: str = "") -> list[dict]:
     return ports
 
 
+# ---------------------------------------------------------------------------
+# Deterministic "labeled I/O" extraction for hubs/adapters/complex devices
+# ---------------------------------------------------------------------------
+
+# Spec keys that indicate port/connector information
+_IO_KEY_RE = re.compile(
+    r'\b(?:i/?o|input|output|interface|connector|connection|host\s*connection|'
+    r'media\s*card\s*reader|card\s*reader|card\s*slot|memory\s*card)\b',
+    re.IGNORECASE,
+)
+
+# Spec keys to skip even if they look I/O-related
+_NOISE_KEY_RE = re.compile(
+    r'\b(?:dimension|weight|enclosure|material|compatibility|resolution|'
+    r'wireless\s*charging|lock\s*slot|cable\s*length|os\b|operating\s*system|'
+    r'max\s*resolution)\b',
+    re.IGNORECASE,
+)
+
+
+def _extract_labeled_io_ports(specs: dict, product_name: str = "") -> list[dict]:
+    """
+    Deterministically extract ports from B&H labeled I/O spec entries.
+    Handles formats like:
+      "USB I/O": "1x USB-C (Charging Only) | 2x USB-A 3.2 Gen 2"
+      "Video I/O": "1x HDMI"
+      "Network I/O": "1x RJ45 (10/100/1000 Mb/s)"
+      "Media Card Reader": "1x SDHC (UHS-I) | 1x microSDHC"
+      "Host Connection": "USB-C 3.2 Gen 2..."
+    Returns a list of port dicts, or empty list if no labeled I/O found.
+    """
+    qty_pattern = re.compile(r"^(\d+)\s*x\s+(.+)$", re.IGNORECASE)
+    ports: list[dict] = []
+    seen_entries: set[str] = set()  # dedup across overlapping categories
+
+    for _category, items in specs.items():
+        for key, value in items.items():
+            # Only process I/O-relevant keys
+            if not _IO_KEY_RE.search(key):
+                continue
+            # Skip noise
+            if _NOISE_KEY_RE.search(key):
+                continue
+            # Skip empty/no values
+            val_stripped = value.strip()
+            if val_stripped.lower() in ("no", "none", "n/a", ""):
+                continue
+            # Deduplicate across categories (Key Specs + General Specs often overlap)
+            dedup = f"{key}|{value}"
+            if dedup in seen_entries:
+                continue
+            seen_entries.add(dedup)
+
+            key_lower = key.lower()
+            is_host = "host" in key_lower
+            has_input = "input" in key_lower
+            has_output = "output" in key_lower
+
+            # Split value into individual port entries on " | " and ", "
+            raw_parts = [
+                p.strip()
+                for segment in value.split(" | ")
+                for p in segment.split(", ")
+                if p.strip() and p.strip().lower() not in ("no", "none", "n/a", "/")
+            ]
+
+            for raw in raw_parts:
+                # Parse "Nx Description"
+                m = qty_pattern.match(raw)
+                if m:
+                    qty = int(m.group(1))
+                    desc = m.group(2).strip()
+                else:
+                    qty = 1
+                    desc = raw.strip()
+
+                if not desc or len(desc) < 2:
+                    continue
+
+                desc_lower = desc.lower()
+
+                # Map to connector type using CONNECTOR_TYPE_PATTERNS
+                mapped = None
+                for type_key, type_info in CONNECTOR_TYPE_PATTERNS:
+                    if type_key in desc_lower:
+                        mapped = type_info
+                        break
+
+                # Fall back to key name for mapping (e.g. "Network I/O" → ethernet)
+                if not mapped:
+                    for type_key, type_info in CONNECTOR_TYPE_PATTERNS:
+                        if type_key in key_lower:
+                            mapped = type_info
+                            break
+
+                if not mapped:
+                    continue  # Can't identify connector — skip
+
+                # Build clean label from description
+                clean_label = re.sub(
+                    r"\s*(male|female)\s*", " ", desc, flags=re.IGNORECASE
+                ).strip()
+                # Trim parenthetical details for cleaner label
+                paren_match = re.match(r"^([^(]+?)(?:\s*\(.+\).*)?$", clean_label)
+                if paren_match:
+                    short = paren_match.group(1).strip()
+                    if len(short) >= 3:
+                        clean_label = short
+                # Cap overly long labels (e.g. host connection with specs in the value)
+                if len(clean_label) > 30:
+                    # Keep just the connector part (e.g. "USB-C 3.1/3.2 Gen 2" → "USB-C")
+                    for type_key, _ in CONNECTOR_TYPE_PATTERNS:
+                        if type_key in clean_label.lower():
+                            clean_label = clean_label[:clean_label.lower().index(type_key) + len(type_key)]
+                            break
+                # Prefix host connection labels
+                if is_host:
+                    clean_label = f"Host {clean_label}"
+
+                # Determine direction
+                if is_host:
+                    direction = "input"  # host cable = signal comes into adapter
+                elif has_input and not has_output:
+                    direction = "input"
+                elif has_output and not has_input:
+                    direction = "output"
+                elif mapped["connector"] in ("ethernet", "usb", "thunderbolt", "sd"):
+                    direction = "bidirectional"
+                elif mapped.get("domain") == "video":
+                    direction = "output"  # adapters/hubs typically output video
+                else:
+                    direction = "bidirectional"
+
+                port: dict = {
+                    "qty": qty,
+                    "label": clean_label,
+                    "connector": mapped["connector"],
+                    "domain": mapped["domain"],
+                    "direction": direction,
+                }
+                if "variant" in mapped:
+                    port["variant"] = mapped["variant"]
+
+                # Try to detect variant from description if not already set
+                if "variant" not in port:
+                    connector = mapped["connector"]
+                    for var_name, var_keywords in VARIANT_EVIDENCE.items():
+                        if var_name.startswith(connector + "-"):
+                            if any(kw in desc_lower for kw in var_keywords):
+                                port["variant"] = var_name
+                                break
+
+                ports.append(port)
+
+    return ports
+
+
 def _detect_device_type(product_name: str) -> str:
     """
     Classify a product into a device type category for direction inference.
@@ -495,7 +707,7 @@ def _fix_port_directions(ports: list[dict], product_name: str = "") -> list[dict
     awareness for video connectors without explicit Input/Output labels.
     """
     video_connectors = {"hdmi", "sdi", "displayport", "bnc"}
-    network_connectors = {"ethernet", "usb", "thunderbolt"}
+    network_connectors = {"ethernet", "usb", "thunderbolt", "sd"}
     device_type = _detect_device_type(product_name)
 
     # Map device type to default video port direction
@@ -561,7 +773,12 @@ def extract_ports_with_llm(specs: dict, product_name: str = "") -> list[dict] | 
     if det_ports:
         return det_ports
 
-    # No "Connector N" entries — use LLM for complex products
+    # Try labeled I/O extraction (reliable for hubs and complex adapters)
+    labeled_ports = _extract_labeled_io_ports(specs, product_name=product_name)
+    if labeled_ports:
+        return labeled_ports
+
+    # No deterministic matches — use LLM for complex products
     # Start Ollama if needed
     if not start_ollama():
         return None
@@ -626,7 +843,7 @@ def extract_ports_with_llm(specs: dict, product_name: str = "") -> list[dict] | 
         valid_connectors = {
             "xlr", "trs", "rca", "hdmi", "sdi", "ethernet", "dante",
             "usb", "speakon", "powercon", "dmx", "fiber", "aes50", "ndi", "wifi",
-            "thunderbolt", "db9", "bnc", "displayport",
+            "thunderbolt", "db9", "bnc", "displayport", "sd",
         }
         valid_domains = {"audio", "video", "network", "power", "av-over-ip"}
         valid_directions = {"input", "output", "bidirectional", "undefined"}
