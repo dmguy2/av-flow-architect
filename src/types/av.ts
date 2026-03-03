@@ -54,6 +54,16 @@ export type ConnectorVariant =
 
 export type PortDirection = 'input' | 'output' | 'bidirectional' | 'undefined'
 
+export type ConferenceRole =
+  | 'far-end-audio-in'
+  | 'far-end-audio-out'
+  | 'far-end-video-in'
+  | 'far-end-video-out'
+  | 'content-share-in'
+  | 'content-share-out'
+  | 'program-out'
+  | 'confidence-monitor'
+
 export type DeviceRole = 'source' | 'destination' | 'processor' | 'infrastructure'
 
 export interface AVPort {
@@ -64,6 +74,7 @@ export interface AVPort {
   variant?: ConnectorVariant
   direction: PortDirection
   enabled?: boolean
+  conferenceRole?: ConferenceRole
 }
 
 export type ComponentCategory = 'audio' | 'video' | 'lighting' | 'infrastructure' | 'corporate' | 'software'

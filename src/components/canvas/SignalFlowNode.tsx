@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo } from 'react'
 import { Handle, Position, useUpdateNodeInternals, type NodeProps, type Node } from '@xyflow/react'
 import type { AVNodeData, AVPort } from '@/types/av'
 import { getSignalColor } from '@/lib/signal-colors'
+import { CONFERENCE_ROLE_SHORT, CONFERENCE_ROLE_COLORS } from '@/lib/conference-roles'
 import { getIcon } from '@/lib/icons'
 import { getComponentDef } from '@/data/component-definitions'
 import { cn } from '@/lib/utils'
@@ -199,13 +200,35 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           return (
             <div key={idx} className="flex items-center h-6 pl-3 pr-3">
               {inp && (
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
                   {inp.label}
+                  {inp.conferenceRole && (
+                    <span
+                      className="text-[7px] font-bold px-1 py-0.5 rounded leading-none"
+                      style={{
+                        backgroundColor: CONFERENCE_ROLE_COLORS[inp.conferenceRole] + '25',
+                        color: CONFERENCE_ROLE_COLORS[inp.conferenceRole],
+                      }}
+                    >
+                      {CONFERENCE_ROLE_SHORT[inp.conferenceRole]}
+                    </span>
+                  )}
                 </span>
               )}
               <span className="flex-1 min-w-3" />
               {out && (
-                <span className="text-[10px] text-muted-foreground whitespace-nowrap text-right">
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap text-right flex items-center justify-end gap-1">
+                  {out.conferenceRole && (
+                    <span
+                      className="text-[7px] font-bold px-1 py-0.5 rounded leading-none"
+                      style={{
+                        backgroundColor: CONFERENCE_ROLE_COLORS[out.conferenceRole] + '25',
+                        color: CONFERENCE_ROLE_COLORS[out.conferenceRole],
+                      }}
+                    >
+                      {CONFERENCE_ROLE_SHORT[out.conferenceRole]}
+                    </span>
+                  )}
                   {out.label}
                 </span>
               )}
@@ -214,15 +237,37 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
         })}
         {bidiPorts.map((port: AVPort) => (
           <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
               ↔ {port.label}
+              {port.conferenceRole && (
+                <span
+                  className="text-[7px] font-bold px-1 py-0.5 rounded leading-none"
+                  style={{
+                    backgroundColor: CONFERENCE_ROLE_COLORS[port.conferenceRole] + '25',
+                    color: CONFERENCE_ROLE_COLORS[port.conferenceRole],
+                  }}
+                >
+                  {CONFERENCE_ROLE_SHORT[port.conferenceRole]}
+                </span>
+              )}
             </span>
           </div>
         ))}
         {undefinedPorts.map((port: AVPort) => (
           <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap italic">
+            <span className="text-[10px] text-muted-foreground whitespace-nowrap italic flex items-center gap-1">
               ? {port.label}
+              {port.conferenceRole && (
+                <span
+                  className="text-[7px] font-bold px-1 py-0.5 rounded leading-none not-italic"
+                  style={{
+                    backgroundColor: CONFERENCE_ROLE_COLORS[port.conferenceRole] + '25',
+                    color: CONFERENCE_ROLE_COLORS[port.conferenceRole],
+                  }}
+                >
+                  {CONFERENCE_ROLE_SHORT[port.conferenceRole]}
+                </span>
+              )}
             </span>
           </div>
         ))}

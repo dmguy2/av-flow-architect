@@ -10,8 +10,9 @@ import { getSignalColor, SIGNAL_LABELS } from '@/lib/signal-colors'
 import { getComponentDef } from '@/data/component-definitions'
 import { getIcon } from '@/lib/icons'
 import { generateId } from '@/lib/utils'
-import type { AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole } from '@/types/av'
+import type { AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole, ConferenceRole } from '@/types/av'
 import { CONNECTOR_VARIANTS, VARIANT_LABELS } from '@/lib/connector-variants'
+import { ALL_CONFERENCE_ROLES, CONFERENCE_ROLE_LABELS, CONFERENCE_ROLE_COLORS } from '@/lib/conference-roles'
 
 export default function PropertiesPanel() {
   const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
@@ -381,6 +382,26 @@ export default function PropertiesPanel() {
                           </select>
                         </div>
                       )}
+                      <div className="flex items-center gap-1.5 pl-3.5">
+                        {port.conferenceRole && (
+                          <div
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: CONFERENCE_ROLE_COLORS[port.conferenceRole] }}
+                          />
+                        )}
+                        <select
+                          value={port.conferenceRole ?? ''}
+                          onChange={(e) => updatePort(port.id, {
+                            conferenceRole: (e.target.value || undefined) as ConferenceRole | undefined,
+                          })}
+                          className="h-5 text-[9px] border border-input rounded px-1 bg-transparent flex-1 text-muted-foreground"
+                        >
+                          <option value="">No conference role</option>
+                          {ALL_CONFERENCE_ROLES.map((r) => (
+                            <option key={r} value={r}>{CONFERENCE_ROLE_LABELS[r]}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   )
                 })}
@@ -394,17 +415,39 @@ export default function PropertiesPanel() {
               <Label className="text-xs">Ports (Fixed I/O)</Label>
               <div className="space-y-1">
                 {data.ports.map((port: AVPort) => (
-                  <div key={port.id} className="flex items-center gap-1.5 px-1 py-0.5">
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: getSignalColor(port.domain) }}
-                      title={SIGNAL_LABELS[port.domain]}
-                    />
-                    <span className="text-[10px] flex-1 truncate">{port.label}</span>
-                    <span className="text-[9px] text-muted-foreground shrink-0">
-                      {CONNECTOR_LABELS[port.connector] ?? port.connector}
-                      {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
-                    </span>
+                  <div key={port.id} className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 px-1 py-0.5">
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: getSignalColor(port.domain) }}
+                        title={SIGNAL_LABELS[port.domain]}
+                      />
+                      <span className="text-[10px] flex-1 truncate">{port.label}</span>
+                      <span className="text-[9px] text-muted-foreground shrink-0">
+                        {CONNECTOR_LABELS[port.connector] ?? port.connector}
+                        {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-1">
+                      {port.conferenceRole && (
+                        <div
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: CONFERENCE_ROLE_COLORS[port.conferenceRole] }}
+                        />
+                      )}
+                      <select
+                        value={port.conferenceRole ?? ''}
+                        onChange={(e) => updatePort(port.id, {
+                          conferenceRole: (e.target.value || undefined) as ConferenceRole | undefined,
+                        })}
+                        className="h-5 text-[9px] border border-input rounded px-1 bg-transparent flex-1 text-muted-foreground"
+                      >
+                        <option value="">No conference role</option>
+                        {ALL_CONFERENCE_ROLES.map((r) => (
+                          <option key={r} value={r}>{CONFERENCE_ROLE_LABELS[r]}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -421,30 +464,52 @@ export default function PropertiesPanel() {
                   return (
                     <div
                       key={port.id}
-                      className="flex items-center gap-1.5 px-1 py-0.5"
+                      className="space-y-0.5"
                       style={{ opacity: enabled ? 1 : 0.5 }}
                     >
-                      <button
-                        onClick={() => togglePortEnabled(port.id)}
-                        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                        title={enabled ? 'Disable port' : 'Enable port'}
-                      >
-                        {enabled ? (
-                          <ToggleRight className="w-4 h-4 text-primary" />
-                        ) : (
-                          <ToggleLeft className="w-4 h-4" />
+                      <div className="flex items-center gap-1.5 px-1 py-0.5">
+                        <button
+                          onClick={() => togglePortEnabled(port.id)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                          title={enabled ? 'Disable port' : 'Enable port'}
+                        >
+                          {enabled ? (
+                            <ToggleRight className="w-4 h-4 text-primary" />
+                          ) : (
+                            <ToggleLeft className="w-4 h-4" />
+                          )}
+                        </button>
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: getSignalColor(port.domain) }}
+                          title={SIGNAL_LABELS[port.domain]}
+                        />
+                        <span className="text-[10px] flex-1 truncate">{port.label}</span>
+                        <span className="text-[9px] text-muted-foreground shrink-0">
+                          {CONNECTOR_LABELS[port.connector] ?? port.connector}
+                          {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-1 pl-6">
+                        {port.conferenceRole && (
+                          <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: CONFERENCE_ROLE_COLORS[port.conferenceRole] }}
+                          />
                         )}
-                      </button>
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: getSignalColor(port.domain) }}
-                        title={SIGNAL_LABELS[port.domain]}
-                      />
-                      <span className="text-[10px] flex-1 truncate">{port.label}</span>
-                      <span className="text-[9px] text-muted-foreground shrink-0">
-                        {CONNECTOR_LABELS[port.connector] ?? port.connector}
-                        {port.variant && ` (${VARIANT_LABELS[port.variant]})`}
-                      </span>
+                        <select
+                          value={port.conferenceRole ?? ''}
+                          onChange={(e) => updatePort(port.id, {
+                            conferenceRole: (e.target.value || undefined) as ConferenceRole | undefined,
+                          })}
+                          className="h-5 text-[9px] border border-input rounded px-1 bg-transparent flex-1 text-muted-foreground"
+                        >
+                          <option value="">No conference role</option>
+                          {ALL_CONFERENCE_ROLES.map((r) => (
+                            <option key={r} value={r}>{CONFERENCE_ROLE_LABELS[r]}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   )
                 })}
