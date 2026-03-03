@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import Toolbar from '@/components/toolbar/Toolbar'
 import ComponentLibrary from '@/components/panels/ComponentLibrary'
@@ -6,12 +6,14 @@ import PropertiesPanel from '@/components/panels/PropertiesPanel'
 import SignalChainPanel from '@/components/panels/SignalChainPanel'
 import AVCanvas from '@/components/canvas/AVCanvas'
 import TemplatePickerDialog from '@/components/toolbar/TemplatePickerDialog'
+import LogConsolePanel from '@/components/panels/LogConsolePanel'
 import { useDiagramStore } from '@/store/diagram-store'
 import { db } from '@/db'
 import { componentDefinitions } from '@/data/component-definitions'
 import type { AVComponentDef } from '@/types/av'
 import { migrateDomain } from '@/lib/domain-migration'
 import { cn } from '@/lib/utils'
+import { log } from '@/lib/logger'
 
 function App() {
   const nodes = useDiagramStore((s) => s.nodes)
@@ -26,6 +28,8 @@ function App() {
   // Load custom components + most recent project on startup
   useEffect(() => {
     async function startup() {
+      log('SYSTEM', 'AV Flow Architect starting up')
+
       // Load custom component definitions from IndexedDB
       const records = await db.customComponents.toArray()
       for (const rec of records) {
@@ -39,11 +43,15 @@ function App() {
         }
       }
       window.dispatchEvent(new Event('av-components-changed'))
+      if (records.length > 0) {
+        log('SYSTEM', `Loaded ${records.length} custom component(s) from IndexedDB`)
+      }
 
       // Auto-load the most recently saved project
       const projects = await db.projects.orderBy('updatedAt').reverse().first()
       if (projects) {
         await loadProject(projects.id)
+        log('SYSTEM', `Auto-loaded project: "${projects.name}"`)
       } else {
         setShowTemplatePicker(true)
       }
@@ -108,84 +116,13 @@ function App() {
           <SignalChainPanel onClose={() => setShowSignalChainPanel(false)} />
         )}
       </div>
-      <StatusBar />
+      <LogConsolePanel />
       {startupDone && nodes.length === 0 && (
         <TemplatePickerDialog
           open={showTemplatePicker}
           onOpenChange={setShowTemplatePicker}
         />
       )}
-    </div>
-  )
-}
-
-function StatusBar() {
-  const nodes = useDiagramStore((s) => s.nodes)
-  const edges = useDiagramStore((s) => s.edges)
-  const mode = useDiagramStore((s) => s.mode)
-  const pages = useDiagramStore((s) => s.pages)
-  const activePageId = useDiagramStore((s) => s.activePageId)
-  const chainIssues = useDiagramStore((s) => s.chainIssues)
-
-  const activePage = pages.find((p) => p.id === activePageId)
-
-  // Total power draw
-  const totalPower = useMemo(() => {
-    let watts = 0
-    for (const node of nodes) {
-      const pd = node.data.powerDraw
-      if (!pd) continue
-      const match = pd.match(/(\d+)\s*w/i)
-      if (match) watts += parseInt(match[1])
-    }
-    return watts
-  }, [nodes])
-
-  const errorCount = chainIssues.filter((i) => i.severity === 'error').length
-  const warnCount = chainIssues.filter((i) => i.severity === 'warning').length
-
-  return (
-    <div className="h-6 border-t border-border bg-card flex items-center px-3 text-[10px] text-muted-foreground gap-3 shrink-0 tabular-nums">
-      {pages.length > 1 && activePage && (
-        <>
-          <span className="font-medium">{activePage.label}</span>
-          <span className="text-border">|</span>
-        </>
-      )}
-      <span>{nodes.length} components</span>
-      <span className="text-border">|</span>
-      <span>{edges.length} connections</span>
-      <span className="text-border">|</span>
-      <span className="capitalize">{mode.replace('-', ' ')}</span>
-      {totalPower > 0 && (
-        <>
-          <span className="text-border">|</span>
-          <span>{totalPower}W total</span>
-        </>
-      )}
-      <div className="flex-1" />
-      {/* Signal chain health */}
-      {chainIssues.length > 0 ? (
-        <div className="flex items-center gap-1.5">
-          {errorCount > 0 && (
-            <span className="flex items-center gap-0.5 text-red-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-              {errorCount} error{errorCount !== 1 ? 's' : ''}
-            </span>
-          )}
-          {warnCount > 0 && (
-            <span className="flex items-center gap-0.5 text-amber-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-              {warnCount} warning{warnCount !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
-      ) : chainIssues.length === 0 && nodes.length > 0 ? (
-        <span className="flex items-center gap-0.5 text-muted-foreground">
-          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 inline-block" />
-          No issues
-        </span>
-      ) : null}
     </div>
   )
 }

@@ -25,6 +25,7 @@ import { SIGNAL_Z_ORDER } from '@/lib/signal-colors'
 import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVPort } from '@/types/av'
 import type { Node, IsValidConnection } from '@xyflow/react'
+import { log } from '@/lib/logger'
 
 const nodeTypes: NodeTypes = {
   signalFlow: SignalFlowNode,
@@ -171,6 +172,7 @@ export default function AVCanvas() {
         },
       }
 
+      log('CANVAS', `Dropped component: "${def.label}"`, def.type)
       addNode(newNode)
     },
     [addNode, mode]
@@ -207,6 +209,7 @@ export default function AVCanvas() {
   )
 
   const onPaneClick = useCallback(() => {
+    log('CANVAS', 'Deselected all (pane click)', undefined, 'debug')
     setSelectedNode(null)
     setSelectedEdge(null)
   }, [setSelectedNode, setSelectedEdge])
@@ -234,7 +237,10 @@ export default function AVCanvas() {
       )
       if (!sourcePort || !targetPort) return true
       const result = validateConnection(sourcePort, targetPort)
-      if (result.tier === 'block') return false
+      if (result.tier === 'block') {
+        log('CONNECTION', `Validation blocked: ${sourcePort.label} → ${targetPort.label}`, result.message, 'warn')
+        return false
+      }
 
       // Enforce one connection per physical port
       const portInUse = edges.some((e) => {

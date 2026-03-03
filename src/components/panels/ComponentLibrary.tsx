@@ -15,6 +15,7 @@ import { scrapeProduct, inferCategory, inferIcon, shutdownDriver } from '@/lib/b
 import { db } from '@/db'
 import type { ComponentCategory, AVPort, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, AVComponentDef, DeviceRole } from '@/types/av'
 import { cn } from '@/lib/utils'
+import { log } from '@/lib/logger'
 
 const CATEGORY_ORDER: { key: ComponentCategory; label: string }[] = [
   { key: 'audio', label: 'Audio' },
@@ -70,6 +71,7 @@ export default function ComponentLibrary() {
   const handleStartImport = useCallback((urls: string[]) => {
     cancelledRef.current = false
     processingRef.current = false
+    log('SCRAPE', `Import batch started: ${urls.length} URL(s)`)
     setImportQueue(urls.map((url) => ({ url, status: 'pending' })))
     setBhImportOpen(false)
     setComponentView('my-gear')
@@ -86,6 +88,9 @@ export default function ComponentLibrary() {
     if (nextPending === -1) {
       // All done — shut down Chrome and show summary then auto-dismiss
       if (importQueue.some((j) => j.status === 'done' || j.status === 'error')) {
+        const done = importQueue.filter((j) => j.status === 'done').length
+        const failed = importQueue.filter((j) => j.status === 'error').length
+        log('SCRAPE', `Import batch complete: ${done} succeeded, ${failed} failed`)
         shutdownDriver()
         setShowSummary(true)
         const timer = setTimeout(() => {
@@ -192,6 +197,7 @@ export default function ComponentLibrary() {
 
   const handleCancelRemaining = useCallback(() => {
     cancelledRef.current = true
+    log('SCRAPE', 'Import batch cancelled by user')
     setImportQueue((q) => {
       // If nothing is currently scraping, shut down Chrome immediately
       if (!q.some((j) => j.status === 'scraping')) shutdownDriver()

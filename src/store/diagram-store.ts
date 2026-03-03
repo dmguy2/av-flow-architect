@@ -19,6 +19,7 @@ import { migrateNodes, migrateEdges } from '@/lib/domain-migration'
 import type { GroupNodeData } from '@/components/canvas/GroupNode'
 import { generateId } from '@/lib/utils'
 import { db } from '@/db'
+import { log } from '@/lib/logger'
 
 interface HistorySnapshot {
   nodes: Node<AVNodeData>[]
@@ -166,6 +167,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setShowSignalChainPanel: (show) => set({ showSignalChainPanel: show }),
 
   onNodesChange: (changes) => {
+    // Log non-position/dimension changes to avoid per-pixel drag spam
+    for (const c of changes) {
+      if (c.type !== 'position' && c.type !== 'dimensions') {
+        log('CANVAS', `Node change: ${c.type}`, 'id' in c ? c.id : undefined, 'debug')
+      }
+    }
     set((state) => ({
       nodes: applyNodeChanges(changes, state.nodes),
       isDirty: true,
@@ -173,6 +180,11 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   onEdgesChange: (changes) => {
+    for (const c of changes) {
+      if (c.type === 'remove') {
+        log('CANVAS', `Edge removed`, 'id' in c ? c.id : undefined)
+      }
+    }
     set((state) => ({
       edges: applyEdgeChanges(changes, state.edges),
       isDirty: true,
@@ -196,7 +208,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         (e.target === connection.target && eTgt === targetPortId)
       )
     })
-    if (portInUse) return
+    if (portInUse) {
+      log('CONNECTION', 'Connection rejected: port already in use', `${connection.source}:${sourcePortId} → ${connection.target}:${targetPortId}`, 'warn')
+      return
+    }
 
     pushHistory()
     const sourceNode = nodes.find((n) => n.id === connection.source)
@@ -221,6 +236,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       }
     }
 
+    const srcLabel = sourceNode?.data.label ?? connection.source
+    const tgtLabel = targetNode?.data.label ?? connection.target
+    const srcPortLabel = sourcePort?.label ?? sourcePortId
+    const tgtPortLabel = targetPort?.label ?? targetPortId
+    log('CONNECTION', `Connected: ${srcLabel}:${srcPortLabel} → ${tgtLabel}:${tgtPortLabel}`, edgeData.connector)
+
     set((state) => ({
       edges: addEdge(
         {
@@ -237,6 +258,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   addNode: (node) => {
     const { pushHistory } = get()
     pushHistory()
+    log('STORE', `Added node: "${node.data.label}"`, node.id)
     set((state) => ({
       nodes: [...state.nodes, node],
       isDirty: true,
@@ -244,8 +266,16 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteSelected: () => {
-    const { pushHistory, selectedNodeId, selectedEdgeId } = get()
+    const { pushHistory, selectedNodeId, selectedEdgeId, nodes: currentNodes } = get()
     pushHistory()
+    if (selectedEdgeId) {
+      log('STORE', `Deleted edge`, selectedEdgeId)
+    } else {
+      const selected = currentNodes.filter((n) => n.selected)
+      if (selected.length > 0) {
+        log('STORE', `Deleted ${selected.length} node(s)`, selected.map((n) => n.data.label).join(', '))
+      }
+    }
     set((state) => {
       // If an edge is selected, delete it
       if (selectedEdgeId) {
@@ -272,8 +302,10 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
 
   updateNodeData: (nodeId, data) => {
-    const { pushHistory } = get()
+    const { pushHistory, nodes } = get()
     pushHistory()
+    const node = nodes.find((n) => n.id === nodeId)
+    log('STORE', `Updated node data: "${node?.data.label ?? nodeId}"`, Object.keys(data).join(', '))
     set((state) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
@@ -283,6 +315,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   setMode: (mode) => {
+    log('VIEW', `Mode changed to: ${mode}`)
     const nodeType = mode === 'signal-flow' ? 'signalFlow' : 'physicalLayout'
     set((state) => ({
       mode,
@@ -303,6 +336,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const { pages, nodes, edges, activePageId } = get()
     const newPageId = generateId()
     const newLabel = label ?? `Page ${pages.length + 1}`
+    log('PROJECT', `Added page: "${newLabel}"`)
+
 
     // Save current page state before switching
     const updatedPages = pages.map((p) =>
@@ -333,6 +368,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   deletePage: (pageId: string) => {
     const { pages, activePageId } = get()
     if (pages.length <= 1) return // Can't delete last page
+    const page = pages.find((p) => p.id === pageId)
+    log('PROJECT', `Deleted page: "${page?.label ?? pageId}"`)
+
 
     const remaining = pages.filter((p) => p.id !== pageId)
     if (activePageId === pageId) {
@@ -364,6 +402,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setActivePage: (pageId: string) => {
     const { pages, activePageId, nodes, edges } = get()
     if (pageId === activePageId) return
+    const target = pages.find((p) => p.id === pageId)
+    log('PROJECT', `Switched to page: "${target?.label ?? pageId}"`)
+
 
     // Save current page state
     const updatedPages = pages.map((p) =>
@@ -401,6 +442,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   undo: () => {
     const { past, nodes, edges } = get()
     if (past.length === 0) return
+    log('STORE', 'Undo', `${past.length} step(s) remaining`)
+
     const prev = past[past.length - 1]
     set({
       past: past.slice(0, -1),
@@ -414,6 +457,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   redo: () => {
     const { future, nodes, edges } = get()
     if (future.length === 0) return
+    log('STORE', 'Redo', `${future.length} step(s) remaining`)
+
     const next = future[0]
     set({
       future: future.slice(1),
@@ -426,6 +471,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   saveProject: async () => {
     const state = get()
+    log('PROJECT', `Saving project: "${state.projectName}"`)
+
     // Sync current page state into pages array
     const syncedPages = state.pages.map((p) =>
       p.id === state.activePageId ? { ...p, nodes: state.nodes, edges: state.edges } : p
@@ -452,6 +499,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   loadProject: async (id: string) => {
     const project = await db.projects.get(id)
     if (!project) return
+    log('PROJECT', `Loading project: "${project.name}"`, `${project.pages?.length ?? 1} page(s)`)
+
 
     // Migrate old single-page projects to pages format
     let pages: ProjectPage[]
@@ -497,6 +546,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   newProject: (name?: string) => {
+    log('PROJECT', `New project: "${name ?? 'Untitled Diagram'}"`)
     const pageId = generateId()
     set({
       projectId: generateId(),
@@ -521,6 +571,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   deleteProject: async (id: string) => {
+    log('PROJECT', `Deleted project`, id)
     await db.projects.delete(id)
   },
 
@@ -530,6 +581,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (selected.length === 0) return
 
     pushHistory()
+    log('STORE', `Duplicated ${selected.length} node(s)`, selected.map((n) => n.data.label).join(', '))
+
     const OFFSET = 40
     const idMap = new Map<string, string>()
 
@@ -573,6 +626,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (selected.length < 2) return
 
     pushHistory()
+    log('STORE', `Aligned ${selected.length} nodes ${axis}ly`)
+
 
     if (axis === 'horizontal') {
       // Align to average Y
@@ -601,6 +656,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (selected.length < 3) return
 
     pushHistory()
+    log('STORE', `Distributed ${selected.length} nodes ${axis}ly`)
+
 
     const sorted = [...selected].sort((a, b) =>
       axis === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y
@@ -649,6 +706,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const { nodes, edges } = get()
     const selected = nodes.filter((n) => n.selected)
     if (selected.length === 0) return
+    log('STORE', `Copied ${selected.length} node(s)`)
+
     const selectedIds = new Set(selected.map((n) => n.id))
     const relatedEdges = edges.filter(
       (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
@@ -666,6 +725,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (!clipboard || clipboard.nodes.length === 0) return
 
     pushHistory()
+    log('STORE', `Pasted ${clipboard.nodes.length} node(s)`)
+
     const OFFSET = 50
     const idMap = new Map<string, string>()
 
@@ -715,6 +776,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   exportProjectFile: () => {
     const state = get()
+    log('PROJECT', `Exporting project file: "${state.projectName}"`)
+
     // Sync current page into pages array
     const syncedPages = state.pages.map((p) =>
       p.id === state.activePageId ? { ...p, nodes: state.nodes, edges: state.edges } : p
@@ -743,6 +806,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   importProjectFile: async (file: File) => {
+    log('PROJECT', `Importing project file: "${file.name}"`)
     const text = await file.text()
     const data = JSON.parse(text)
     if (!data.nodes && !data.pages) {
@@ -800,6 +864,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (selected.length < 2) return
 
     pushHistory()
+    log('STORE', `Grouped ${selected.length} nodes as "${label}"`)
+
 
     const PADDING = 30
     const HEADER = 28
@@ -847,6 +913,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     if (!groupNode) return
 
     pushHistory()
+    log('STORE', `Ungrouped: "${(groupNode.data as any).label ?? groupId}"`)
+
 
     const updatedNodes = nodes
       .filter((n) => n.id !== groupId)
@@ -872,6 +940,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   toggleLayerVisibility: (domain: SignalDomain) => {
+    const current = get().layerVisibility[domain]
+    log('VIEW', `Layer ${domain}: ${current ? 'hidden' : 'visible'}`)
     set((state) => ({
       layerVisibility: {
         ...state.layerVisibility,
@@ -881,14 +951,17 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   setFocusedLayer: (domain: SignalDomain | null) => {
+    log('VIEW', domain ? `Focused layer: ${domain}` : 'Cleared layer focus')
     set({ focusedLayer: domain })
   },
 
   setShowEdgeLabels: (show: boolean) => {
+    log('VIEW', `Edge labels: ${show ? 'shown' : 'hidden'}`)
     set({ showEdgeLabels: show })
   },
 
   setShowProductImages: (show) => {
+    log('VIEW', `Product images: ${show ? 'shown' : 'hidden'}`)
     const { nodes } = get()
 
     const IMAGE_W = 180

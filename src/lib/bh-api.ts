@@ -4,6 +4,8 @@
  * Thin fetch client for the B&H scraper backend.
  */
 
+import { log } from '@/lib/logger'
+
 export interface ScrapedPort {
   qty: number
   label: string
@@ -26,6 +28,7 @@ export interface ScrapeResult {
  * The Vite dev server proxies /api/* to http://127.0.0.1:8420.
  */
 export async function scrapeProduct(url: string): Promise<ScrapeResult> {
+  log('SCRAPE', `Scraping B&H product`, url)
   const response = await fetch('/api/scrape', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -34,16 +37,21 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || `Scrape failed (${response.status})`)
+    const err = body.detail || `Scrape failed (${response.status})`
+    log('SCRAPE', `Scrape failed: ${err}`, url, 'error')
+    throw new Error(err)
   }
 
-  return response.json()
+  const result: ScrapeResult = await response.json()
+  log('SCRAPE', `Scrape complete: "${result.name}" (${result.ports.length} ports)`, `source: ${result.port_source}`)
+  return result
 }
 
 /**
  * Tell the backend to shut down Chrome. Call after a batch import finishes.
  */
 export async function shutdownDriver(): Promise<void> {
+  log('SCRAPE', 'Shutting down Chrome driver')
   try {
     await fetch('/api/driver/shutdown', { method: 'POST', signal: AbortSignal.timeout(5000) })
   } catch {
@@ -57,8 +65,10 @@ export async function shutdownDriver(): Promise<void> {
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     const res = await fetch('/api/health', { signal: AbortSignal.timeout(3000) })
+    log('SCRAPE', `Backend health: ${res.ok ? 'OK' : 'unhealthy'}`, undefined, res.ok ? 'debug' : 'warn')
     return res.ok
   } catch {
+    log('SCRAPE', 'Backend unreachable', undefined, 'warn')
     return false
   }
 }

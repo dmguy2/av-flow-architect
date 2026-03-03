@@ -5,6 +5,7 @@
  */
 
 import type { SignalChain } from './signal-chain'
+import { log } from '@/lib/logger'
 
 export interface LLMChainIssue {
   severity: 'error' | 'warning' | 'info'
@@ -21,6 +22,7 @@ export interface LLMAnalysisResult {
 export async function analyzeChainWithLLM(
   chain: SignalChain
 ): Promise<LLMAnalysisResult> {
+  log('LLM', `LLM analysis started for chain: ${chain.id}`, `${chain.path.length} nodes, domain: ${chain.domain}`)
   const body = {
     chain: chain.path.map((node) => ({
       label: node.label,
@@ -44,8 +46,11 @@ export async function analyzeChainWithLLM(
 
   if (!response.ok) {
     const detail = await response.text().catch(() => 'Unknown error')
+    log('LLM', `LLM analysis failed: ${detail}`, chain.id, 'error')
     throw new Error(`Analysis failed: ${detail}`)
   }
 
-  return response.json()
+  const result: LLMAnalysisResult = await response.json()
+  log('LLM', `LLM analysis complete: ${result.issues.length} issue(s)`, result.summary)
+  return result
 }
