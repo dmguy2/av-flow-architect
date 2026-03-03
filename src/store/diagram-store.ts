@@ -180,11 +180,25 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   onConnect: (connection: Connection) => {
-    const { nodes, pushHistory } = get()
-    pushHistory()
+    const { nodes, edges, pushHistory } = get()
 
     const sourcePortId = connection.sourceHandle?.replace(/-(?:target|source)$/, '') ?? connection.sourceHandle
     const targetPortId = connection.targetHandle?.replace(/-(?:target|source)$/, '') ?? connection.targetHandle
+
+    // Enforce one connection per physical port — reject if either port is already wired
+    const portInUse = edges.some((e) => {
+      const eSrc = e.sourceHandle?.replace(/-(?:target|source)$/, '') ?? e.sourceHandle
+      const eTgt = e.targetHandle?.replace(/-(?:target|source)$/, '') ?? e.targetHandle
+      return (
+        (e.source === connection.source && eSrc === sourcePortId) ||
+        (e.target === connection.source && eTgt === sourcePortId) ||
+        (e.source === connection.target && eSrc === targetPortId) ||
+        (e.target === connection.target && eTgt === targetPortId)
+      )
+    })
+    if (portInUse) return
+
+    pushHistory()
     const sourceNode = nodes.find((n) => n.id === connection.source)
     const sourcePort = sourceNode?.data.ports.find(
       (p: AVPort) => p.id === sourcePortId
@@ -874,7 +888,71 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     set({ showEdgeLabels: show })
   },
 
-  setShowProductImages: (show) => set({ showProductImages: show }),
+  setShowProductImages: (show) => {
+    const { nodes } = get()
+
+    const IMAGE_W = 180
+    const IMAGE_H = 170
+
+    const estimateModuleHeight = (n: Node<AVNodeData>) => {
+      const enabled = n.data.ports.filter((p: AVPort) => p.enabled !== false)
+      const inputs = enabled.filter((p: AVPort) => p.direction === 'input').length
+      const outputs = enabled.filter((p: AVPort) => p.direction === 'output').length
+      const bidi = enabled.filter((p: AVPort) => p.direction === 'bidirectional').length
+      const undef = enabled.filter((p: AVPort) => p.direction === 'undefined').length
+      const rows = Math.max(inputs, outputs) + bidi + undef
+      return Math.max(44 + rows * 24 + 12, 80)
+    }
+
+    const MODULE_W = 280
+
+    // Only scale positions for root-level AV nodes (not groups, offsheet, or grouped children)
+    const scalable = nodes.filter(
+      (n) => !n.parentId && n.type !== 'group' && n.type !== 'offsheetConnector'
+    )
+
+    if (scalable.length < 2) {
+      set({ showProductImages: show })
+      return
+    }
+
+    // Compute average old/new dimensions
+    let avgOldW = 0, avgOldH = 0, avgNewW = 0, avgNewH = 0
+    for (const n of scalable) {
+      const mh = estimateModuleHeight(n)
+      if (show) {
+        // Switching TO image mode: old = module, new = image
+        avgOldW += MODULE_W; avgOldH += mh
+        avgNewW += IMAGE_W;  avgNewH += IMAGE_H
+      } else {
+        // Switching TO module mode: old = image, new = module
+        avgOldW += IMAGE_W;  avgOldH += IMAGE_H
+        avgNewW += MODULE_W; avgNewH += mh
+      }
+    }
+    avgOldW /= scalable.length; avgOldH /= scalable.length
+    avgNewW /= scalable.length; avgNewH /= scalable.length
+
+    const scaleX = avgNewW / avgOldW
+    const scaleY = avgNewH / avgOldH
+
+    // Scale positions relative to the centroid
+    const cx = scalable.reduce((s, n) => s + n.position.x, 0) / scalable.length
+    const cy = scalable.reduce((s, n) => s + n.position.y, 0) / scalable.length
+
+    const updatedNodes = nodes.map((n) => {
+      if (n.parentId || n.type === 'group' || n.type === 'offsheetConnector') return n
+      return {
+        ...n,
+        position: {
+          x: Math.round((cx + (n.position.x - cx) * scaleX) / 16) * 16,
+          y: Math.round((cy + (n.position.y - cy) * scaleY) / 16) * 16,
+        },
+      }
+    })
+
+    set({ showProductImages: show, nodes: updatedNodes })
+  },
 
   // Signal chain analysis
   runSignalChainAnalysis: () => {

@@ -1,10 +1,11 @@
-import { useCallback, useRef, useMemo } from 'react'
+import { useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   BackgroundVariant,
+  useReactFlow,
   type NodeTypes,
   type EdgeTypes,
   type OnSelectionChangeFunc,
@@ -38,6 +39,7 @@ const edgeTypes: EdgeTypes = {
 
 export default function AVCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const { fitView } = useReactFlow()
   const {
     nodes,
     edges,
@@ -50,6 +52,18 @@ export default function AVCanvas() {
     setSelectedEdge,
     deleteSelected,
   } = useDiagramStore()
+  const showProductImages = useDiagramStore((s) => s.showProductImages)
+
+  // Fit viewport after toggling between image/module view
+  const prevShowImages = useRef(showProductImages)
+  useEffect(() => {
+    if (prevShowImages.current !== showProductImages) {
+      prevShowImages.current = showProductImages
+      // Allow nodes to re-render with new dimensions before fitting
+      const timer = setTimeout(() => fitView({ padding: 0.15, duration: 300 }), 350)
+      return () => clearTimeout(timer)
+    }
+  }, [showProductImages, fitView])
 
   // Wrap onNodesChange to detect selection changes
   const handleNodesChange = useCallback(
@@ -220,9 +234,24 @@ export default function AVCanvas() {
       )
       if (!sourcePort || !targetPort) return true
       const result = validateConnection(sourcePort, targetPort)
-      return result.tier !== 'block'
+      if (result.tier === 'block') return false
+
+      // Enforce one connection per physical port
+      const portInUse = edges.some((e) => {
+        const eSrc = e.sourceHandle?.replace(/-(?:target|source)$/, '') ?? e.sourceHandle
+        const eTgt = e.targetHandle?.replace(/-(?:target|source)$/, '') ?? e.targetHandle
+        return (
+          (e.source === connection.source && eSrc === sourcePortId) ||
+          (e.target === connection.source && eTgt === sourcePortId) ||
+          (e.source === connection.target && eSrc === targetPortId) ||
+          (e.target === connection.target && eTgt === targetPortId)
+        )
+      })
+      if (portInUse) return false
+
+      return true
     },
-    [nodes]
+    [nodes, edges]
   )
 
   return (
