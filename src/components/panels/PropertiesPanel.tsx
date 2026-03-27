@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image, Box, RefreshCw, Loader2 } from 'lucide-react'
+import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image, Box, RefreshCw, Loader2, LayoutDashboard, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -180,13 +180,106 @@ export default function PropertiesPanel() {
     )
   }
 
-  // No selection
+  // No selection — show system summary
   if (!selectedNode) {
-    return (
-      <div className="border-l border-border bg-sidebar flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-xs text-muted-foreground leading-relaxed">
-          Select a component or connection to view its properties
+    const equipment = nodes.filter((n) => n.type !== 'group')
+    const sources = equipment.filter((n) => n.data.deviceRole === 'source').length
+    const processors = equipment.filter((n) => n.data.deviceRole === 'processor').length
+    const destinations = equipment.filter((n) => n.data.deviceRole === 'destination').length
+    const infra = equipment.filter((n) => n.data.deviceRole === 'infrastructure').length
+    const unassigned = equipment.length - sources - processors - destinations - infra
+
+    const audioCables = edges.filter((e) => e.data?.domain === 'audio').length
+    const videoCables = edges.filter((e) => e.data?.domain === 'video').length
+    const networkCables = edges.filter((e) => e.data?.domain === 'network' || e.data?.domain === 'av-over-ip').length
+    const powerCables = edges.filter((e) => e.data?.domain === 'power').length
+
+    const chainIssues = useDiagramStore.getState().chainIssues
+    const errors = chainIssues.filter((i) => i.severity === 'error').length
+    const warnings = chainIssues.filter((i) => i.severity === 'warning').length
+
+    let totalW = 0
+    for (const n of equipment) {
+      const m = n.data.powerDraw?.match(/(\d+(?:\.\d+)?)\s*[Ww]/)
+      if (m) totalW += parseFloat(m[1])
+    }
+
+    if (equipment.length === 0 && edges.length === 0) {
+      return (
+        <div className="border-l border-border bg-sidebar flex flex-col items-center justify-center p-6 text-center">
+          <div className="text-xs text-muted-foreground leading-relaxed">
+            Drag equipment from the library to start designing
+          </div>
         </div>
+      )
+    }
+
+    return (
+      <div className="border-l border-border bg-sidebar flex flex-col h-full">
+        <div className="p-3 pb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <LayoutDashboard className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              System Summary
+            </h2>
+          </div>
+        </div>
+        <Separator />
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-4">
+            {/* Equipment */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Equipment ({equipment.length})</Label>
+              <div className="grid grid-cols-2 gap-1">
+                {sources > 0 && <div className="text-[10px] text-muted-foreground">{sources} source{sources !== 1 ? 's' : ''}</div>}
+                {processors > 0 && <div className="text-[10px] text-muted-foreground">{processors} processor{processors !== 1 ? 's' : ''}</div>}
+                {destinations > 0 && <div className="text-[10px] text-muted-foreground">{destinations} destination{destinations !== 1 ? 's' : ''}</div>}
+                {infra > 0 && <div className="text-[10px] text-muted-foreground">{infra} infrastructure</div>}
+                {unassigned > 0 && <div className="text-[10px] text-muted-foreground/60">{unassigned} unassigned</div>}
+              </div>
+            </div>
+
+            {/* Cables */}
+            {edges.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cables ({edges.length})</Label>
+                <div className="grid grid-cols-2 gap-1">
+                  {audioCables > 0 && <div className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#3B82F6]" />{audioCables} audio</div>}
+                  {videoCables > 0 && <div className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#22C55E]" />{videoCables} video</div>}
+                  {networkCables > 0 && <div className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#EAB308]" />{networkCables} network</div>}
+                  {powerCables > 0 && <div className="text-[10px] text-muted-foreground flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#EF4444]" />{powerCables} power</div>}
+                </div>
+              </div>
+            )}
+
+            {/* Power */}
+            {totalW > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Zap className="w-3 h-3" /> Power Draw</Label>
+                <div className="text-[10px] text-muted-foreground">
+                  {totalW >= 1000 ? `${(totalW / 1000).toFixed(1)} kW` : `${totalW}W`}
+                  <span className="text-muted-foreground/50 ml-1">({(totalW / 120).toFixed(1)}A @ 120V)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Validation */}
+            {chainIssues.length > 0 ? (
+              <div className="space-y-1">
+                <Label className="text-xs">Validation</Label>
+                <div className="flex items-center gap-2 text-[10px]">
+                  {errors > 0 && <span className="text-red-500 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />{errors} error{errors !== 1 ? 's' : ''}</span>}
+                  {warnings > 0 && <span className="text-amber-500 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />{warnings} warning{warnings !== 1 ? 's' : ''}</span>}
+                </div>
+              </div>
+            ) : equipment.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[10px] text-green-600 dark:text-green-400">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                No issues detected
+              </div>
+            )}
+          </div>
+        </ScrollArea>
       </div>
     )
   }
