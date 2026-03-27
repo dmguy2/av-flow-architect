@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Node rendering error boundaries** — All node types (SignalFlow, PhysicalLayout, Group, OffsheetConnector) wrapped in React error boundaries. If a component has bad data (corrupted B&H import, malformed custom component), the node shows a red "Render Error" placeholder instead of crashing the entire app. Prevents white-screen-of-death from a single bad node. Inspired by React resilient UI patterns.
 - **Keyboard shortcuts help dialog** — Press `?` or click the keyboard icon in the toolbar to see all available shortcuts. Groups shortcuts by General, Selection & Editing, and Canvas categories with clean `<kbd>` styling. Makes all existing shortcuts discoverable. Inspired by Figma/VS Code keyboard shortcut overlays.
 - **Connector type labels on ports** — Every port on every node now shows a tiny connector type abbreviation (XLR, HDMI, ETH, DTE, SDI, etc.) next to the port label. AV designers can immediately see what physical connector each port uses without clicking into properties. Styled at 7px in very muted color to avoid visual clutter. Inspired by Q-SYS Designer and Crestron D3 Pro port labeling conventions.
 - **Recently used components** — Component library shows a "Recent" section at the top with the last 6 components you placed on the canvas. Persists across sessions via localStorage. Hidden during search. Saves repeated scrolling when placing multiple copies of the same gear.

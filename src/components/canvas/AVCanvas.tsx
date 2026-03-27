@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo, useEffect, useState } from 'react'
+import React, { useCallback, useRef, useMemo, useEffect, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -25,13 +25,53 @@ import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
-import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize } from 'lucide-react'
+import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle } from 'lucide-react'
+
+// ── Error boundary for node rendering resilience ──
+
+class NodeErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  state: { hasError: boolean; error?: Error } = { hasError: false }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-destructive/10 border-2 border-destructive/30 border-dashed rounded-lg p-3 min-w-[130px] text-center">
+          <AlertTriangle className="w-4 h-4 text-destructive mx-auto mb-1" />
+          <div className="text-[10px] font-medium text-destructive">Render Error</div>
+          <div className="text-[8px] text-muted-foreground mt-0.5 truncate max-w-[140px]">
+            {this.state.error?.message ?? 'Unknown error'}
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function withNodeErrorBoundary<P extends object>(
+  Component: React.ComponentType<P>
+): React.ComponentType<P> {
+  const Wrapped = (props: P) => (
+    <NodeErrorBoundary>
+      <Component {...props} />
+    </NodeErrorBoundary>
+  )
+  Wrapped.displayName = `Safe(${Component.displayName || Component.name || 'Node'})`
+  return Wrapped
+}
 
 const nodeTypes: NodeTypes = {
-  signalFlow: SignalFlowNode,
-  physicalLayout: PhysicalLayoutNode,
-  group: GroupNode,
-  offsheetConnector: OffsheetConnectorNode,
+  signalFlow: withNodeErrorBoundary(SignalFlowNode),
+  physicalLayout: withNodeErrorBoundary(PhysicalLayoutNode),
+  group: withNodeErrorBoundary(GroupNode),
+  offsheetConnector: withNodeErrorBoundary(OffsheetConnectorNode),
 }
 
 const edgeTypes: EdgeTypes = {
