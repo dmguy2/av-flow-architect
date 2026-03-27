@@ -54,6 +54,7 @@ export default function ComponentLibrary() {
   const [refresh, setRefresh] = useState(0)
   const [activeTab, setActiveTab] = useState<SidebarTab>('components')
   const [componentView, setComponentView] = useState<ComponentView>('library')
+  const [categoryFilter, setCategoryFilter] = useState<ComponentCategory | null>(null)
   const [bhImportOpen, setBhImportOpen] = useState(false)
   const [importQueue, setImportQueue] = useState<ImportJob[]>([])
   const [editDef, setEditDef] = useState<AVComponentDef | null>(null)
@@ -278,17 +279,23 @@ export default function ComponentLibrary() {
   }, [])
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return activeDefs
-    const q = search.toLowerCase()
-    return activeDefs.filter(
-      (c) =>
-        c.label.toLowerCase().includes(q) ||
-        c.type.toLowerCase().includes(q) ||
-        c.category.toLowerCase().includes(q) ||
-        (c.manufacturer && c.manufacturer.toLowerCase().includes(q)) ||
-        (c.model && c.model.toLowerCase().includes(q))
-    )
-  }, [search, activeDefs])
+    let result = activeDefs
+    if (categoryFilter) {
+      result = result.filter((c) => c.category === categoryFilter)
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (c) =>
+          c.label.toLowerCase().includes(q) ||
+          c.type.toLowerCase().includes(q) ||
+          c.category.toLowerCase().includes(q) ||
+          (c.manufacturer && c.manufacturer.toLowerCase().includes(q)) ||
+          (c.model && c.model.toLowerCase().includes(q))
+      )
+    }
+    return result
+  }, [search, activeDefs, categoryFilter])
 
   // Progress card component
   const renderProgressCard = () => {
@@ -483,6 +490,36 @@ export default function ComponentLibrary() {
               )}
             </div>
           </div>
+          {/* Category filter pills (library view only) */}
+          {componentView === 'library' && (
+            <div className="px-3 pb-1 flex flex-wrap gap-1">
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className={cn(
+                  'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                  categoryFilter === null
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                )}
+              >
+                All
+              </button>
+              {CATEGORY_ORDER.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setCategoryFilter(categoryFilter === key ? null : key)}
+                  className={cn(
+                    'px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors',
+                    categoryFilter === key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <EditComponentDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
