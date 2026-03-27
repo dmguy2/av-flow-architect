@@ -1,5 +1,5 @@
-import { useCallback, useEffect } from 'react'
-import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box, Keyboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -11,10 +11,46 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import ExportMenu from './ExportMenu'
 import CustomComponentDialog from './CustomComponentDialog'
 import ProjectManager from './ProjectManager'
 import { useDiagramStore } from '@/store/diagram-store'
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
+const MOD = isMac ? '⌘' : 'Ctrl+'
+
+const SHORTCUT_GROUPS = [
+  {
+    label: 'General',
+    shortcuts: [
+      { keys: `${MOD}S`, action: 'Save project' },
+      { keys: `${MOD}Z`, action: 'Undo' },
+      { keys: `${MOD}⇧Z`, action: 'Redo' },
+      { keys: '?', action: 'Show keyboard shortcuts' },
+    ],
+  },
+  {
+    label: 'Selection & Editing',
+    shortcuts: [
+      { keys: `${MOD}A`, action: 'Select all' },
+      { keys: `${MOD}C`, action: 'Copy selected' },
+      { keys: `${MOD}V`, action: 'Paste' },
+      { keys: `${MOD}D`, action: 'Duplicate selected' },
+      { keys: `${MOD}G`, action: 'Group selected nodes' },
+      { keys: 'Delete', action: 'Delete selected' },
+      { keys: 'Double-click', action: 'Edit node/edge label' },
+    ],
+  },
+  {
+    label: 'Canvas',
+    shortcuts: [
+      { keys: 'Right-click', action: 'Context menu' },
+      { keys: 'Scroll', action: 'Zoom in/out' },
+      { keys: 'Click + drag', action: 'Pan canvas' },
+    ],
+  },
+]
 
 export default function Toolbar() {
   const {
@@ -47,6 +83,7 @@ export default function Toolbar() {
   } = useDiagramStore()
 
   const selectedCount = nodes.filter((n) => n.selected && n.type !== 'group').length
+  const [showShortcuts, setShowShortcuts] = useState(false)
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -89,6 +126,9 @@ export default function Toolbar() {
           e.preventDefault()
           selectAll()
         }
+      }
+      if (e.key === '?' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        setShowShortcuts(true)
       }
     },
     [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll]
@@ -338,6 +378,45 @@ export default function Toolbar() {
 
       {/* Custom component creator */}
       <CustomComponentDialog />
+
+      {/* Keyboard shortcuts help */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowShortcuts(true)}>
+            <Keyboard className="w-3.5 h-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Keyboard shortcuts (?)</TooltipContent>
+      </Tooltip>
+      <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Keyboard className="w-4 h-4" />
+              Keyboard Shortcuts
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {SHORTCUT_GROUPS.map((group) => (
+              <div key={group.label}>
+                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                  {group.label}
+                </h4>
+                <div className="space-y-1">
+                  {group.shortcuts.map((s) => (
+                    <div key={s.keys} className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{s.action}</span>
+                      <kbd className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded border border-border text-muted-foreground">
+                        {s.keys}
+                      </kbd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Theme toggle */}
       <Tooltip>

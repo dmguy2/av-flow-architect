@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Keyboard shortcuts help dialog** — Press `?` or click the keyboard icon in the toolbar to see all available shortcuts. Groups shortcuts by General, Selection & Editing, and Canvas categories with clean `<kbd>` styling. Makes all existing shortcuts discoverable. Inspired by Figma/VS Code keyboard shortcut overlays.
 - **Connector type labels on ports** — Every port on every node now shows a tiny connector type abbreviation (XLR, HDMI, ETH, DTE, SDI, etc.) next to the port label. AV designers can immediately see what physical connector each port uses without clicking into properties. Styled at 7px in very muted color to avoid visual clutter. Inspired by Q-SYS Designer and Crestron D3 Pro port labeling conventions.
 - **Recently used components** — Component library shows a "Recent" section at the top with the last 6 components you placed on the canvas. Persists across sessions via localStorage. Hidden during search. Saves repeated scrolling when placing multiple copies of the same gear.
 - **Double-click to edit node labels** — Double-click any equipment node's label to rename it inline. Works in both module view and image view. Enter to commit, Escape to cancel. Follows the same pattern as GroupNode and AVEdge inline editing. Inspired by draw.io/Figma double-click-to-edit convention.
