@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Auto-run signal chain analysis** — Signal chain validation now runs automatically (debounced 800ms) whenever connections change. Issues appear immediately on node badges and the toolbar indicator without needing to manually click "Analyze." Uses an edge fingerprint to only re-analyze when the actual connection topology changes, not on drag/position updates. Inspired by IDE linting patterns (ESLint as-you-type).
 - **Connected port visual state** — Port handles now visually distinguish connected vs unconnected ports. Connected ports are filled with full domain color and glow. Unconnected ports are semi-transparent with an outline — immediately showing which ports still need wiring. Applied to all port types (input, output, bidirectional, undefined). Uses an optimized per-node edge selector. Inspired by Q-SYS Designer connected-port highlighting.
 - **Align & Distribute in context menu** — Right-clicking with multiple nodes selected now shows Align Horizontally, Align Vertically, and (with 3+ nodes) Distribute Horizontally/Vertically options. Previously these were only in toolbar dropdowns. Deepens the existing context menu to cover the most common multi-select actions.
 - **Total system power draw indicator** — Toolbar status area now shows live total power consumption (e.g., "⚡ 2.4 kW") summed from all equipment with powerDraw data. Hover tooltip shows breakdown in watts and equivalent amperage at 120V/240V for circuit breaker sizing. Only appears when equipment has power specs. Inspired by electrical CAD load calculators.

@@ -160,6 +160,21 @@ export default function Toolbar() {
     return () => clearTimeout(timer)
   }, [nodes, edges, isDirty, saveProject])
 
+  // Auto-run signal chain analysis when connections change (debounced)
+  const edgeFingerprint = useMemo(
+    () => edges.map((e) => `${e.source}:${e.sourceHandle}-${e.target}:${e.targetHandle}`).sort().join('|'),
+    [edges]
+  )
+  useEffect(() => {
+    if (edges.length === 0 && nodes.length === 0) return
+    const timer = setTimeout(() => {
+      runSignalChainAnalysis()
+    }, 800)
+    return () => clearTimeout(timer)
+    // Only re-run when the actual connection topology changes, not on every edge/node prop change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgeFingerprint, nodes.length])
+
   // Init dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
