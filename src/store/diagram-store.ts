@@ -12,7 +12,7 @@ import {
 import type { AVNodeData, AVEdgeData, DiagramMode, AVProject, AVPort, SignalDomain, ProjectPage, ViewMode } from '@/types/av'
 import { validateConnection } from '@/lib/connection-validation'
 import { traceSignalChains } from '@/lib/signal-chain'
-import { analyzeChainsDeterministic, type ChainIssue } from '@/lib/signal-chain-rules'
+import { analyzeChainsDeterministic, analyzeGraphIssues, type ChainIssue } from '@/lib/signal-chain-rules'
 import { analyzeChainWithLLM, type LLMChainIssue } from '@/lib/chain-analysis-api'
 import type { SignalChain } from '@/lib/signal-chain'
 import { migrateNodes, migrateEdges } from '@/lib/domain-migration'
@@ -1129,8 +1129,9 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   runSignalChainAnalysis: () => {
     const { nodes, edges } = get()
     const chains = traceSignalChains(nodes, edges)
-    const issues = analyzeChainsDeterministic(chains)
-    set({ signalChains: chains, chainIssues: issues, llmIssues: [], llmAnalysisSummary: null })
+    const chainIssues = analyzeChainsDeterministic(chains)
+    const graphIssues = analyzeGraphIssues(nodes, edges)
+    set({ signalChains: chains, chainIssues: [...chainIssues, ...graphIssues], llmIssues: [], llmAnalysisSummary: null })
   },
 
   runLLMAnalysis: async (chainId: string) => {
