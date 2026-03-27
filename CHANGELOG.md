@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Fix: Search overlay click-outside dismissal** — The Ctrl+F search overlay now closes when clicking anywhere outside it (canvas, panels, etc.). Previously it only closed via Escape or the X button, which meant it could obscure the diagram indefinitely. Added an invisible backdrop matching the context menu pattern.
 - **Fix: System summary validation status reactivity** — Fixed bug where the Properties Panel system summary used `getState()` for chain issues instead of a proper Zustand selector, causing validation status to not update when auto-analysis ran. Now subscribes reactively so error/warning counts update immediately.
 - **Escape to deselect** — Pressing Escape now deselects all nodes and edges (when not in a text input or search overlay). The most fundamental interaction pattern in diagramming tools — closes the gap with Figma/draw.io conventions. Added to keyboard shortcuts help dialog.
 - **Context menu headers** — Node and edge context menus now show the device/cable label as a header (e.g., "FOH Console", "C-03") so you can verify you're acting on the correct element before choosing an action. Prevents misclicks in dense diagrams. Standard pattern from Figma/draw.io context menus.

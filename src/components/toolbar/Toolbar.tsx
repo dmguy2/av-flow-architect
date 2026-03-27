@@ -516,6 +516,8 @@ export default function Toolbar() {
 
       {/* Node search overlay */}
       {showSearch && (
+        <>
+        <div className="fixed inset-0 z-40" onClick={() => setShowSearch(false)} />
         <div className="absolute right-3 top-full mt-1 z-50 w-72 rounded-md border bg-popover shadow-lg overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b">
             <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -558,6 +560,7 @@ export default function Toolbar() {
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   )
