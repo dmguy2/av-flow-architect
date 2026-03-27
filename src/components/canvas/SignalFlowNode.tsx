@@ -30,6 +30,17 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
   const showProductImages = useDiagramStore((s) => s.showProductImages)
   const updateNodeData = useDiagramStore((s) => s.updateNodeData)
 
+  // Connected port detection — only re-renders when THIS node's connections change
+  const connectedPortsKey = useDiagramStore((s) => {
+    const ids: string[] = []
+    for (const e of s.edges) {
+      if (e.source === id && e.sourceHandle) ids.push(e.sourceHandle.replace(/-(?:target|source)$/, ''))
+      if (e.target === id && e.targetHandle) ids.push(e.targetHandle.replace(/-(?:target|source)$/, ''))
+    }
+    return ids.sort().join(',')
+  })
+  const connectedPorts = useMemo(() => new Set(connectedPortsKey.split(',').filter(Boolean)), [connectedPortsKey])
+
   // Inline label editing
   const [editing, setEditing] = useState(false)
   const [labelText, setLabelText] = useState(data.label)
@@ -355,6 +366,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
         {/* Handles — absolutely positioned to match row centers */}
         {inputPorts.map((port: AVPort, idx: number) => {
           const color = getSignalColor(port.domain)
+          const isConnected = connectedPorts.has(port.id)
           return (
             <Handle
               key={port.id}
@@ -363,17 +375,18 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
               id={port.id}
               style={{
                 top: 6 + 12 + idx * 24,
-                background: color,
+                background: isConnected ? color : `${color}30`,
                 width: 9,
                 height: 9,
-                border: '2px solid var(--color-card)',
-                boxShadow: `0 0 4px ${color}50`,
+                border: isConnected ? '2px solid var(--color-card)' : `2px solid ${color}`,
+                boxShadow: isConnected ? `0 0 4px ${color}50` : 'none',
               }}
             />
           )
         })}
         {outputPorts.map((port: AVPort, idx: number) => {
           const color = getSignalColor(port.domain)
+          const isConnected = connectedPorts.has(port.id)
           return (
             <Handle
               key={port.id}
@@ -382,11 +395,11 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
               id={port.id}
               style={{
                 top: 6 + 12 + idx * 24,
-                background: color,
+                background: isConnected ? color : `${color}30`,
                 width: 9,
                 height: 9,
-                border: '2px solid var(--color-card)',
-                boxShadow: `0 0 4px ${color}50`,
+                border: isConnected ? '2px solid var(--color-card)' : `2px solid ${color}`,
+                boxShadow: isConnected ? `0 0 4px ${color}50` : 'none',
               }}
             />
           )
@@ -394,6 +407,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
         {bidiPorts.map((port: AVPort, idx: number) => {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + idx) * 24
           const color = getSignalColor(port.domain)
+          const isConnected = connectedPorts.has(port.id)
           return (
             <span key={port.id}>
               <Handle
@@ -402,11 +416,11 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
                 id={`${port.id}-target`}
                 style={{
                   top: topOffset,
-                  background: color,
+                  background: isConnected ? color : `${color}30`,
                   width: 9,
                   height: 9,
-                  border: '2px solid var(--color-card)',
-                  boxShadow: `0 0 4px ${color}50`,
+                  border: isConnected ? '2px solid var(--color-card)' : `2px solid ${color}`,
+                  boxShadow: isConnected ? `0 0 4px ${color}50` : 'none',
                 }}
               />
               <Handle
@@ -416,11 +430,11 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
                 isConnectableEnd
                 style={{
                   top: topOffset,
-                  background: color,
+                  background: isConnected ? color : `${color}30`,
                   width: 9,
                   height: 9,
-                  border: '2px solid var(--color-card)',
-                  boxShadow: `0 0 4px ${color}50`,
+                  border: isConnected ? '2px solid var(--color-card)' : `2px solid ${color}`,
+                  boxShadow: isConnected ? `0 0 4px ${color}50` : 'none',
                   zIndex: 1,
                 }}
               />
@@ -429,6 +443,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
         })}
         {undefinedPorts.map((port: AVPort, idx: number) => {
           const topOffset = 6 + 12 + (Math.max(inputPorts.length, outputPorts.length) + bidiPorts.length + idx) * 24
+          const isConnected = connectedPorts.has(port.id)
           return (
             <span key={port.id}>
               <Handle
@@ -437,11 +452,11 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
                 id={`${port.id}-target`}
                 style={{
                   top: topOffset,
-                  background: '#6B7280',
+                  background: isConnected ? '#6B7280' : '#6B728030',
                   width: 9,
                   height: 9,
-                  border: '2px dashed var(--color-card)',
-                  boxShadow: '0 0 4px #6B728050',
+                  border: isConnected ? '2px dashed var(--color-card)' : '2px dashed #6B7280',
+                  boxShadow: isConnected ? '0 0 4px #6B728050' : 'none',
                 }}
               />
               <Handle
@@ -451,11 +466,11 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
                 isConnectableEnd
                 style={{
                   top: topOffset,
-                  background: '#6B7280',
+                  background: isConnected ? '#6B7280' : '#6B728030',
                   width: 9,
                   height: 9,
-                  border: '2px dashed var(--color-card)',
-                  boxShadow: '0 0 4px #6B728050',
+                  border: isConnected ? '2px dashed var(--color-card)' : '2px dashed #6B7280',
+                  boxShadow: isConnected ? '0 0 4px #6B728050' : 'none',
                   zIndex: 1,
                 }}
               />
