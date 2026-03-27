@@ -30,6 +30,13 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
   const showProductImages = useDiagramStore((s) => s.showProductImages)
   const updateNodeData = useDiagramStore((s) => s.updateNodeData)
 
+  // Highlight when a connected edge is selected
+  const isEdgeEndpoint = useDiagramStore((s) => {
+    if (!s.selectedEdgeId) return false
+    const edge = s.edges.find((e) => e.id === s.selectedEdgeId)
+    return edge ? edge.source === id || edge.target === id : false
+  })
+
   // Connected port detection — only re-renders when THIS node's connections change
   const connectedPortsKey = useDiagramStore((s) => {
     const ids: string[] = []
@@ -135,8 +142,10 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           pointerEvents: isDimmed ? 'none' : undefined,
           boxShadow: selected
             ? `0 0 0 2px ${glowColor}40, 0 0 20px ${glowColor}15, 0 4px 12px rgba(0,0,0,0.3)`
-            : '0 2px 8px rgba(0,0,0,0.15)',
-          borderColor: selected ? 'transparent' : undefined,
+            : isEdgeEndpoint
+              ? `0 0 0 1.5px ${glowColor}30, 0 0 12px ${glowColor}10, 0 2px 8px rgba(0,0,0,0.15)`
+              : '0 2px 8px rgba(0,0,0,0.15)',
+          borderColor: selected ? 'transparent' : isEdgeEndpoint ? `${glowColor}30` : undefined,
         }}
       >
         {/* Product image or icon fallback */}
@@ -210,7 +219,9 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
         transition: 'opacity 0.2s ease, box-shadow 0.15s ease, border-color 0.15s ease',
         boxShadow: selected
           ? `0 0 0 2px ${glowColor}40, 0 0 20px ${glowColor}15, 0 4px 12px rgba(0,0,0,0.3)`
-          : '0 2px 8px rgba(0,0,0,0.15)',
+          : isEdgeEndpoint
+            ? `0 0 0 1.5px ${glowColor}30, 0 0 12px ${glowColor}10, 0 2px 8px rgba(0,0,0,0.15)`
+            : '0 2px 8px rgba(0,0,0,0.15)',
       }}
     >
       {/* Issue badge */}
