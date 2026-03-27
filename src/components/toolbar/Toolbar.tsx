@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box, Keyboard } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box, Keyboard, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -84,6 +84,18 @@ export default function Toolbar() {
 
   const selectedCount = nodes.filter((n) => n.selected && n.type !== 'group').length
   const [showShortcuts, setShowShortcuts] = useState(false)
+
+  // Total system power draw
+  const totalPowerW = useMemo(() => {
+    let total = 0
+    for (const node of nodes) {
+      const pd = node.data.powerDraw
+      if (!pd) continue
+      const match = pd.match(/(\d+(?:\.\d+)?)\s*[Ww]/)
+      if (match) total += parseFloat(match[1])
+    }
+    return total
+  }, [nodes])
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -352,10 +364,31 @@ export default function Toolbar() {
       <div className="flex-1" />
 
       {/* Status */}
-      <div className="text-[11px] text-muted-foreground hidden md:flex gap-2.5 tabular-nums">
+      <div className="text-[11px] text-muted-foreground hidden md:flex items-center gap-2.5 tabular-nums">
         <span>{nodes.length} nodes</span>
         <span className="text-border">|</span>
         <span>{edges.length} edges</span>
+        {totalPowerW > 0 && (
+          <>
+            <span className="text-border">|</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center gap-1 cursor-default">
+                  <Zap className="w-3 h-3" />
+                  {totalPowerW >= 1000 ? `${(totalPowerW / 1000).toFixed(1)} kW` : `${totalPowerW}W`}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <div className="text-xs space-y-0.5">
+                  <div className="font-medium">System Power Draw</div>
+                  <div>{totalPowerW.toLocaleString()}W total</div>
+                  <div>{(totalPowerW / 120).toFixed(1)}A @ 120V</div>
+                  <div>{(totalPowerW / 240).toFixed(1)}A @ 240V</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
       </div>
 
       <Separator orientation="vertical" className="h-5 mx-1" />
