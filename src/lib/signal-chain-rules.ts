@@ -153,6 +153,34 @@ function checkVideoChainLength(chain: SignalChain): ChainIssue | null {
 }
 
 /**
+ * Check for powered speakers connected downstream of an amplifier.
+ * Powered speakers have built-in amplification — routing an external
+ * amplifier's speaker-level output to them can damage the speaker's
+ * internal amp. The signal should come from a line-level source.
+ */
+function checkAmplifierToPoweredSpeaker(chain: SignalChain): ChainIssue | null {
+  if (chain.domain !== 'audio') return null
+  if (chain.path.length < 2) return null
+
+  const dest = chain.path[chain.path.length - 1]
+  if (!POWERED_SPEAKERS.has(dest.componentType)) return null
+
+  // Check if an amplifier appears upstream of the powered speaker
+  const upstream = chain.path.slice(0, -1)
+  const ampNode = upstream.find((n) => AMPLIFIER_DEVICES.has(n.componentType) && !POWERED_SPEAKERS.has(n.componentType))
+  if (!ampNode) return null
+
+  return {
+    severity: 'error',
+    category: 'power',
+    message: `Powered speaker "${dest.label}" is downstream of amplifier "${ampNode.label}" — speaker-level signal may damage its internal amp`,
+    suggestion: 'Connect powered speakers to line-level outputs (mixer, DSP), not amplifier speaker outputs',
+    chainId: chain.id,
+    affectedNodes: [ampNode.nodeId, dest.nodeId],
+  }
+}
+
+/**
  * Run all deterministic rules against a set of signal chains.
  * Returns all issues found.
  */
@@ -163,6 +191,7 @@ export function analyzeChainsDeterministic(chains: SignalChain[]): ChainIssue[] 
     checkMissingPreamp,
     checkMissingAmplifier,
     checkGainStaging,
+    checkAmplifierToPoweredSpeaker,
     checkVideoChainLength,
   ]
 
