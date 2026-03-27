@@ -6,7 +6,7 @@
  * missing preamps, unpowered passive speakers, and gain staging.
  */
 
-import type { SignalChain, SignalChainNode } from './signal-chain'
+import type { SignalChain } from './signal-chain'
 
 export interface ChainIssue {
   severity: 'error' | 'warning' | 'info'
@@ -47,9 +47,6 @@ const POWERED_SPEAKERS = new Set([
   'powered-speaker',
 ])
 
-const HI_Z_SOURCES = new Set([
-  'di-box', // DI boxes are often at the end of a hi-Z guitar signal
-])
 
 /**
  * Check if a chain has a microphone going directly to a powered speaker

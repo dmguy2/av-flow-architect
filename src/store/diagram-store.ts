@@ -9,7 +9,7 @@ import {
   applyEdgeChanges,
   addEdge,
 } from '@xyflow/react'
-import type { AVNodeData, AVEdgeData, DiagramMode, AVProject, AVPort, SignalDomain, ProjectPage } from '@/types/av'
+import type { AVNodeData, AVEdgeData, DiagramMode, AVProject, AVPort, SignalDomain, ProjectPage, ViewMode } from '@/types/av'
 import { validateConnection } from '@/lib/connection-validation'
 import { traceSignalChains } from '@/lib/signal-chain'
 import { analyzeChainsDeterministic, type ChainIssue } from '@/lib/signal-chain-rules'
@@ -109,8 +109,15 @@ interface DiagramState {
   layerVisibility: Record<SignalDomain, boolean>
   focusedLayer: SignalDomain | null
   showEdgeLabels: boolean
+  viewMode: ViewMode
   showProductImages: boolean
+  setViewMode: (mode: ViewMode) => void
   setShowProductImages: (show: boolean) => void
+
+  // 3D model state
+  model3dUrls: Record<string, string>
+  model3dStatus: Record<string, string>
+  generate3DModels: () => Promise<void>
   toggleLayerVisibility: (domain: SignalDomain) => void
   setFocusedLayer: (domain: SignalDomain | null) => void
   setShowEdgeLabels: (show: boolean) => void
@@ -155,7 +162,12 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   layerVisibility: { audio: true, video: true, network: true, power: true, 'av-over-ip': true },
   focusedLayer: null,
   showEdgeLabels: false,
+  viewMode: 'module',
   showProductImages: false,
+
+  // 3D model state
+  model3dUrls: {},
+  model3dStatus: {},
 
   // Signal chain analysis
   signalChains: [],
@@ -223,9 +235,18 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       (p: AVPort) => p.id === targetPortId
     )
 
+    // Auto-assign cable ID
+    let maxCableNum = 0
+    for (const e of edges) {
+      const m = e.data?.label?.match(/^C-(\d+)$/)
+      if (m) maxCableNum = Math.max(maxCableNum, parseInt(m[1], 10))
+    }
+    const cableLabel = `C-${String(maxCableNum + 1).padStart(2, '0')}`
+
     const edgeData: AVEdgeData = {
       domain: sourcePort?.domain ?? 'audio',
       connector: sourcePort?.connector ?? 'xlr',
+      label: cableLabel,
     }
 
     // Attach warning if validation produces a warn-tier result
@@ -240,7 +261,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const tgtLabel = targetNode?.data.label ?? connection.target
     const srcPortLabel = sourcePort?.label ?? sourcePortId
     const tgtPortLabel = targetPort?.label ?? targetPortId
-    log('CONNECTION', `Connected: ${srcLabel}:${srcPortLabel} → ${tgtLabel}:${tgtPortLabel}`, edgeData.connector)
+    log('CONNECTION', `${cableLabel}: ${srcLabel}:${srcPortLabel} → ${tgtLabel}:${tgtPortLabel}`, edgeData.connector)
 
     set((state) => ({
       edges: addEdge(
@@ -491,6 +512,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       showEdgeLabels: state.showEdgeLabels,
       pages: syncedPages,
       activePageId: state.activePageId,
+      viewMode: state.viewMode,
     }
     await db.projects.put(project)
     set({ pages: syncedPages, isDirty: false })
@@ -538,6 +560,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       layerVisibility: project.layerVisibility ?? { audio: true, video: true, network: true, power: true, 'av-over-ip': true },
       focusedLayer: project.focusedLayer ?? null,
       showEdgeLabels: project.showEdgeLabels ?? false,
+      viewMode: project.viewMode ?? 'module',
+      showProductImages: (project.viewMode ?? 'module') === 'image',
       isDirty: false,
       past: [],
       future: [],
@@ -958,6 +982,80 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setShowEdgeLabels: (show: boolean) => {
     log('VIEW', `Edge labels: ${show ? 'shown' : 'hidden'}`)
     set({ showEdgeLabels: show })
+  },
+
+  setViewMode: (mode: ViewMode) => {
+    const prev = get().viewMode
+    if (prev === mode) return
+    log('VIEW', `View mode: ${mode}`)
+
+    // Handle position scaling when switching between module and image
+    if ((prev === 'module' && mode === 'image') || (prev === 'image' && mode === 'module')) {
+      // setShowProductImages handles both the position scaling and the state update
+      get().setShowProductImages(mode === 'image')
+      set({ viewMode: mode, isDirty: true })
+    } else {
+      // Switching to/from 3D — no position scaling needed
+      set({ viewMode: mode, showProductImages: mode === 'image', isDirty: true })
+    }
+  },
+
+  generate3DModels: async () => {
+    const { nodes } = get()
+    const { getComponentDef } = await import('@/data/component-definitions')
+    const uniqueTypes = new Map<string, string>()
+    for (const n of nodes) {
+      if ((n.type === 'signalFlow' || n.type === 'physicalLayout') && !uniqueTypes.has(n.data.componentType)) {
+        // Try node image first, then fall back to component definition
+        const image = n.data.image || getComponentDef(n.data.componentType)?.images?.[0]
+        if (image) {
+          uniqueTypes.set(n.data.componentType, image)
+        }
+      }
+    }
+
+    if (uniqueTypes.size === 0) {
+      log('3D', 'No components with images to generate')
+      return
+    }
+
+    log('3D', `Generating 3D models for ${uniqueTypes.size} component type(s)`)
+
+    // Import dynamically to avoid circular deps
+    const { getOrGenerate3DModel } = await import('@/lib/model3d-manager')
+
+    // Process with 20s spacing to respect 3 req/min rate limit
+    const entries = Array.from(uniqueTypes.entries())
+    for (let i = 0; i < entries.length; i++) {
+      const [compType, image] = entries[i]
+      const currentStatus = get().model3dStatus[compType]
+      if (currentStatus === 'ready' || currentStatus === 'generating') continue
+
+      set((s) => ({
+        model3dStatus: { ...s.model3dStatus, [compType]: 'generating' },
+      }))
+
+      try {
+        const url = await getOrGenerate3DModel(compType, image, (status) => {
+          log('3D', `${compType}: ${status}`, undefined, 'debug')
+        })
+        set((s) => ({
+          model3dUrls: { ...s.model3dUrls, [compType]: url },
+          model3dStatus: { ...s.model3dStatus, [compType]: 'ready' },
+        }))
+        log('3D', `Model ready: ${compType}`)
+      } catch (err) {
+        set((s) => ({
+          model3dStatus: { ...s.model3dStatus, [compType]: 'failed' },
+        }))
+        log('3D', `Model failed: ${compType}`, String(err), 'error')
+      }
+
+      // Rate limit spacing (skip delay after last item)
+      if (i < entries.length - 1) {
+        await new Promise((r) => setTimeout(r, 20_000))
+      }
+    }
   },
 
   setShowProductImages: (show) => {

@@ -5,12 +5,11 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
+  ConnectionMode,
   useReactFlow,
   type NodeTypes,
   type EdgeTypes,
   type OnSelectionChangeFunc,
-  type NodeChange,
-  type EdgeChange,
 } from '@xyflow/react'
 import SignalFlowNode from './SignalFlowNode'
 import PhysicalLayoutNode from './PhysicalLayoutNode'
@@ -23,8 +22,8 @@ import { getComponentDef } from '@/data/component-definitions'
 import { generateId } from '@/lib/utils'
 import { SIGNAL_Z_ORDER } from '@/lib/signal-colors'
 import { validateConnection } from '@/lib/connection-validation'
-import type { AVNodeData, AVPort } from '@/types/av'
-import type { Node, IsValidConnection } from '@xyflow/react'
+import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
+import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
 
 const nodeTypes: NodeTypes = {
@@ -68,7 +67,7 @@ export default function AVCanvas() {
 
   // Wrap onNodesChange to detect selection changes
   const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
+    (changes: NodeChange<Node<AVNodeData>>[]) => {
       onNodesChange(changes)
       const selectionChange = changes.find(
         (c) => c.type === 'select'
@@ -91,7 +90,7 @@ export default function AVCanvas() {
   )
 
   const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
+    (changes: EdgeChange<Edge<AVEdgeData>>[]) => {
       onEdgesChange(changes)
       const selectionChange = changes.find(
         (c) => c.type === 'select'
@@ -278,6 +277,7 @@ export default function AVCanvas() {
         edgeTypes={edgeTypes}
         connectionLineComponent={ConnectionLine}
         isValidConnection={isValidConnection}
+        connectionMode={ConnectionMode.Loose}
         defaultEdgeOptions={{ type: 'avEdge' }}
         snapToGrid
         snapGrid={[16, 16]}

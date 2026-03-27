@@ -63,7 +63,6 @@ export default function ComponentLibrary() {
   const processingRef = useRef(false)
 
   const isImporting = importQueue.some((j) => j.status === 'pending' || j.status === 'scraping')
-  const currentIndex = importQueue.findIndex((j) => j.status === 'scraping')
   const doneCount = importQueue.filter((j) => j.status === 'done').length
   const errorCount = importQueue.filter((j) => j.status === 'error').length
   const totalCount = importQueue.length
@@ -120,10 +119,19 @@ export default function ComponentLibrary() {
           return
         }
 
+        // Filter out description-like entries that aren't real ports
+        const realPorts = result.ports.filter((p) => {
+          const label = (p.label || '').toLowerCase()
+          // Skip entries that are descriptions, not actual ports
+          if (label.length > 60) return false
+          if (/\btotal\b|\bsupporting\b|\bup to\b|\bfeatures?\b|\bincluded?\b/i.test(label)) return false
+          return true
+        })
+
         // Expand qty > 1 into individual port rows
         const expanded: AVPort[] = []
         let portIdx = 1
-        for (const p of result.ports) {
+        for (const p of realPorts) {
           const qty = Math.max(1, p.qty)
           for (let i = 0; i < qty; i++) {
             const port: AVPort = {
@@ -139,6 +147,23 @@ export default function ComponentLibrary() {
             expanded.push(port)
             portIdx++
           }
+        }
+
+        // Auto-add a power port if specs mention power but no power port was extracted
+        const hasPowerPort = expanded.some((p) => p.domain === 'power')
+        const specsText = JSON.stringify(result.specs || {}).toLowerCase()
+        const needsPower = !hasPowerPort && (
+          /\bpower\b|\bwatt|\bvolt|\bac adapter|\bdc\b|\bpower supply\b|\bpower consumption/i.test(specsText) ||
+          /\bpower\b/i.test(result.name)
+        )
+        if (needsPower) {
+          expanded.push({
+            id: `port-${portIdx}`,
+            label: 'Power',
+            domain: 'power' as SignalDomain,
+            connector: 'powercon' as ConnectorType,
+            direction: 'input' as PortDirection,
+          })
         }
 
         const cat = inferCategory(result.name)

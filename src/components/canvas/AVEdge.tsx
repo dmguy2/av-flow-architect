@@ -131,21 +131,21 @@ function AVEdge({
           </div>
         </foreignObject>
       )}
-      {/* Inline short label when showEdgeLabels is enabled */}
+      {/* Inline short label when showEdgeLabels is enabled — shows cable ID or domain abbreviation */}
       {showEdgeLabels && !editing && !showProductImages && (
         <foreignObject
-          x={labelX - 20}
+          x={labelX - 24}
           y={labelY - 10}
-          width={40}
+          width={48}
           height={20}
           style={{ pointerEvents: 'none' }}
         >
           <div className="flex items-center justify-center h-full">
             <span
-              className="px-1 py-0.5 rounded text-[8px] font-bold text-white uppercase"
+              className="px-1 py-0.5 rounded text-[8px] font-bold text-white uppercase whitespace-nowrap"
               style={{ backgroundColor: color }}
             >
-              {shortLabel}
+              {data?.label || shortLabel}
             </span>
           </div>
         </foreignObject>

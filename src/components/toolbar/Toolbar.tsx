@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react'
-import { Undo2, Redo2, Moon, Sun, Cable, Layout, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Eye } from 'lucide-react'
+import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -20,7 +20,6 @@ export default function Toolbar() {
   const {
     projectName,
     setProjectName,
-    mode,
     setMode,
     darkMode,
     setDarkMode,
@@ -43,8 +42,8 @@ export default function Toolbar() {
     setShowSignalChainPanel,
     runSignalChainAnalysis,
     chainIssues,
-    showProductImages,
-    setShowProductImages,
+    viewMode,
+    setViewMode,
   } = useDiagramStore()
 
   const selectedCount = nodes.filter((n) => n.selected && n.type !== 'group').length
@@ -125,14 +124,14 @@ export default function Toolbar() {
 
       <Separator orientation="vertical" className="h-5 mx-1" />
 
-      {/* Mode toggle — segmented control */}
+      {/* View selector: Signal Flow | Clean View | 3D */}
       <div className="flex p-0.5 rounded-md bg-muted/60">
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => setMode('signal-flow')}
+              onClick={() => { setMode('signal-flow'); setViewMode('module') }}
               className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all ${
-                mode === 'signal-flow'
+                viewMode === 'module'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -141,23 +140,39 @@ export default function Toolbar() {
               Signal Flow
             </button>
           </TooltipTrigger>
-          <TooltipContent>Signal flow diagram mode</TooltipContent>
+          <TooltipContent>Detailed wiring diagram with ports</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={() => setMode('physical-layout')}
+              onClick={() => setViewMode('image')}
               className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all ${
-                mode === 'physical-layout'
+                viewMode === 'image'
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <Layout className="w-3 h-3" />
-              Physical
+              <Image className="w-3 h-3" />
+              Clean View
             </button>
           </TooltipTrigger>
-          <TooltipContent>Physical layout / stage plot mode</TooltipContent>
+          <TooltipContent>Product images with connections</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded transition-all ${
+                viewMode === '3d'
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Box className="w-3 h-3" />
+              3D
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Interactive 3D view</TooltipContent>
         </Tooltip>
       </div>
 
@@ -293,23 +308,6 @@ export default function Toolbar() {
         <TooltipContent>Analyze signal chains for issues</TooltipContent>
       </Tooltip>
 
-      <Separator orientation="vertical" className="h-5 mx-1" />
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={showProductImages ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setShowProductImages(!showProductImages)}
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {showProductImages ? 'Hide product images' : 'Show product images'}
-        </TooltipContent>
-      </Tooltip>
 
       <div className="flex-1" />
 

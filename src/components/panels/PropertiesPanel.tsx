@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image } from 'lucide-react'
+import { useMemo, useState, useCallback } from 'react'
+import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image, Box, RefreshCw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,12 +10,14 @@ import { getSignalColor, SIGNAL_LABELS } from '@/lib/signal-colors'
 import { getComponentDef } from '@/data/component-definitions'
 import { getIcon } from '@/lib/icons'
 import { generateId } from '@/lib/utils'
-import type { AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole, ConferenceRole } from '@/types/av'
+import type { AVNodeData, AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole, ConferenceRole } from '@/types/av'
 import { CONNECTOR_VARIANTS, VARIANT_LABELS } from '@/lib/connector-variants'
 import { ALL_CONFERENCE_ROLES, CONFERENCE_ROLE_LABELS, CONFERENCE_ROLE_COLORS } from '@/lib/conference-roles'
 
 export default function PropertiesPanel() {
   const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
+  const viewMode = useDiagramStore((s) => s.viewMode)
+  const model3dStatus = useDiagramStore((s) => s.model3dStatus)
 
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId),
@@ -166,7 +168,7 @@ export default function PropertiesPanel() {
   }
 
   // Node properties view
-  const data = selectedNode.data
+  const data: AVNodeData = selectedNode.data
   const def = getComponentDef(data.componentType)
   const Icon = getIcon(def?.icon ?? 'BoxSelect')
 
@@ -518,7 +520,7 @@ export default function PropertiesPanel() {
           )}
 
           {/* Product Info & Specs */}
-          {(def?.images?.length || def?.specs || def?.bhUrl || data.images || data.specs || data.bhUrl) && (
+          {!!(def?.images?.length || def?.specs || def?.bhUrl || data.images || data.specs || data.bhUrl) && (
             <>
               <Separator />
               <ProductInfo
@@ -532,6 +534,18 @@ export default function PropertiesPanel() {
           )}
 
           <Separator />
+
+          {/* 3D Model section — only in 3D view */}
+          {viewMode === '3d' && (
+            <>
+              <Separator />
+              <Model3DSection
+                componentType={data.componentType}
+                status={model3dStatus[data.componentType]}
+                hasImage={!!data.image}
+              />
+            </>
+          )}
 
           {/* Delete */}
           <Button
@@ -654,6 +668,60 @@ function ProductInfo({ def, image, nodeImages, nodeSpecs, nodeBhUrl }: {
           View on B&H Photo
         </a>
       )}
+    </div>
+  )
+}
+
+/* ── 3D Model sub-component ── */
+
+function Model3DSection({ componentType, status, hasImage }: {
+  componentType: string
+  status?: string
+  hasImage: boolean
+}) {
+  const [regenerating, setRegenerating] = useState(false)
+
+  const handleRegenerate = useCallback(async () => {
+    setRegenerating(true)
+    try {
+      const { deleteCachedModel } = await import('@/lib/model3d-manager')
+      await deleteCachedModel(componentType)
+      // Re-trigger generation via store
+      const store = useDiagramStore.getState()
+      store.generate3DModels()
+    } finally {
+      setRegenerating(false)
+    }
+  }, [componentType])
+
+  const statusLabel = !hasImage ? 'No Image' : status === 'ready' ? 'Ready' : status === 'generating' ? 'Generating...' : status === 'failed' ? 'Failed' : 'Pending'
+  const statusColor = status === 'ready' ? 'text-green-500' : status === 'generating' ? 'text-blue-500' : status === 'failed' ? 'text-red-500' : 'text-muted-foreground'
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs flex items-center gap-1">
+        <Box className="w-3 h-3" />
+        3D Model
+      </Label>
+      <div className="flex items-center gap-2">
+        <span className={`text-[10px] font-medium ${statusColor}`}>
+          {status === 'generating' && <Loader2 className="w-3 h-3 inline animate-spin mr-1" />}
+          {statusLabel}
+        </span>
+        <div className="flex-1" />
+        {hasImage && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 text-[10px] gap-1"
+            onClick={handleRegenerate}
+            disabled={regenerating || status === 'generating'}
+          >
+            <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} />
+            Regenerate
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
