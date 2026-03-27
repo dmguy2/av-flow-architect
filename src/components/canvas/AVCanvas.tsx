@@ -190,6 +190,15 @@ export default function AVCanvas() {
 
       log('CANVAS', `Dropped component: "${def.label}"`, def.type)
       addNode(newNode)
+
+      // Track recently used component types in localStorage
+      try {
+        const key = 'av-recent-components'
+        const recent: string[] = JSON.parse(localStorage.getItem(key) || '[]')
+        const updated = [componentType, ...recent.filter((t) => t !== componentType)].slice(0, 8)
+        localStorage.setItem(key, JSON.stringify(updated))
+        window.dispatchEvent(new Event('av-recent-changed'))
+      } catch { /* ignore localStorage errors */ }
     },
     [addNode, mode]
   )

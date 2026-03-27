@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Boxes, Layers, FileStack, Download, Package, Library, Loader2, Check, X, Ban } from 'lucide-react'
+import { Search, Boxes, Layers, FileStack, Download, Package, Library, Loader2, Check, X, Ban, Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -258,6 +258,25 @@ export default function ComponentLibrary() {
 
   const activeDefs = componentView === 'library' ? builtInDefs : myGearDefs
 
+  // Recently used components (persisted in localStorage, refreshed on component changes)
+  const recentDefs = useMemo(() => {
+    try {
+      const types: string[] = JSON.parse(localStorage.getItem('av-recent-components') || '[]')
+      return types
+        .map((t) => componentDefinitions.find((c) => c.type === t))
+        .filter((d): d is AVComponentDef => d !== undefined)
+        .slice(0, 6)
+    } catch { return [] }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh])
+
+  // Listen for drops on the canvas to refresh recent list
+  useEffect(() => {
+    const handler = () => setRefresh((n) => n + 1)
+    window.addEventListener('av-recent-changed', handler)
+    return () => window.removeEventListener('av-recent-changed', handler)
+  }, [])
+
   const filtered = useMemo(() => {
     if (!search.trim()) return activeDefs
     const q = search.toLowerCase()
@@ -480,6 +499,20 @@ export default function ComponentLibrary() {
             {/* Library view: grouped by category */}
             {componentView === 'library' && (
               <div className="p-2 space-y-3">
+                {/* Recently used components */}
+                {!search && recentDefs.length > 0 && (
+                  <div>
+                    <h3 className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1.5">
+                      <Clock className="w-3 h-3" />
+                      Recent
+                    </h3>
+                    <div className="space-y-1">
+                      {recentDefs.map((def) => (
+                        <ComponentCard key={`recent-${def.type}`} def={def} />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {CATEGORY_ORDER.map(({ key, label }) => {
                   const items = filtered.filter((c) => c.category === key)
                   if (items.length === 0) return null
