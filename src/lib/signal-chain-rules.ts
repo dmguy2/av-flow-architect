@@ -258,8 +258,75 @@ function checkDisconnectedSources(
 }
 
 /**
+ * Detect audio signal feedback loops — cycles in the audio graph where
+ * a device's output routes back to its own input. This is the #1 wiring
+ * disaster in live sound: feedback loops can damage speakers and ears.
+ */
+function checkFeedbackLoops(
+  nodes: Node<AVNodeData>[],
+  edges: Edge<AVEdgeData>[]
+): ChainIssue[] {
+  // Build adjacency list for audio-domain edges only
+  const adj = new Map<string, string[]>()
+  for (const edge of edges) {
+    const domain = edge.data?.domain
+    if (domain !== 'audio' && domain !== 'av-over-ip') continue
+    if (!edge.source || !edge.target) continue
+    const targets = adj.get(edge.source)
+    if (targets) targets.push(edge.target)
+    else adj.set(edge.source, [edge.target])
+  }
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+  const issues: ChainIssue[] = []
+  const reported = new Set<string>()
+
+  // DFS from each node to detect back-edges (cycles)
+  for (const startId of adj.keys()) {
+    const visited = new Set<string>()
+    const inStack = new Set<string>()
+    const stack: { nodeId: string; path: string[] }[] = [{ nodeId: startId, path: [startId] }]
+
+    while (stack.length > 0) {
+      const { nodeId, path } = stack.pop()!
+
+      if (inStack.has(nodeId)) {
+        // Found a cycle — extract the loop portion
+        const loopStart = path.indexOf(nodeId)
+        const loopNodes = path.slice(loopStart)
+        const loopKey = [...loopNodes].sort().join(',')
+        if (!reported.has(loopKey)) {
+          reported.add(loopKey)
+          const labels = loopNodes.map((id) => nodeMap.get(id)?.data.label ?? id)
+          issues.push({
+            severity: 'warning',
+            category: 'signal-type',
+            message: `Audio feedback loop: ${labels.join(' → ')} → ${labels[0]}`,
+            suggestion: 'Break the feedback loop by removing a connection or inserting a mix-minus / feedback eliminator',
+            chainId: '',
+            affectedNodes: loopNodes,
+          })
+        }
+        continue
+      }
+
+      if (visited.has(nodeId)) continue
+      visited.add(nodeId)
+      inStack.add(nodeId)
+
+      const neighbors = adj.get(nodeId) ?? []
+      for (const neighbor of neighbors) {
+        stack.push({ nodeId: neighbor, path: [...path, neighbor] })
+      }
+    }
+  }
+
+  return issues
+}
+
+/**
  * Graph-level analysis that checks all nodes/edges for structural issues
- * (disconnected devices, etc.) that chain-level analysis can't detect.
+ * (disconnected devices, feedback loops, etc.) that chain-level analysis can't detect.
  */
 export function analyzeGraphIssues(
   nodes: Node<AVNodeData>[],
@@ -268,5 +335,6 @@ export function analyzeGraphIssues(
   return [
     ...checkDisconnectedSinks(nodes, edges),
     ...checkDisconnectedSources(nodes, edges),
+    ...checkFeedbackLoops(nodes, edges),
   ]
 }
