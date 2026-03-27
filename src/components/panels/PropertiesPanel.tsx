@@ -18,6 +18,7 @@ export default function PropertiesPanel() {
   const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
   const viewMode = useDiagramStore((s) => s.viewMode)
   const model3dStatus = useDiagramStore((s) => s.model3dStatus)
+  const chainIssuesFromStore = useDiagramStore((s) => s.chainIssues)
 
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId),
@@ -194,9 +195,8 @@ export default function PropertiesPanel() {
     const networkCables = edges.filter((e) => e.data?.domain === 'network' || e.data?.domain === 'av-over-ip').length
     const powerCables = edges.filter((e) => e.data?.domain === 'power').length
 
-    const chainIssues = useDiagramStore.getState().chainIssues
-    const errors = chainIssues.filter((i) => i.severity === 'error').length
-    const warnings = chainIssues.filter((i) => i.severity === 'warning').length
+    const errors = chainIssuesFromStore.filter((i) => i.severity === 'error').length
+    const warnings = chainIssuesFromStore.filter((i) => i.severity === 'warning').length
 
     let totalW = 0
     for (const n of equipment) {
@@ -264,7 +264,7 @@ export default function PropertiesPanel() {
             )}
 
             {/* Validation */}
-            {chainIssues.length > 0 ? (
+            {chainIssuesFromStore.length > 0 ? (
               <div className="space-y-1">
                 <Label className="text-xs">Validation</Label>
                 <div className="flex items-center gap-2 text-[10px]">
