@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Align & Distribute in context menu** — Right-clicking with multiple nodes selected now shows Align Horizontally, Align Vertically, and (with 3+ nodes) Distribute Horizontally/Vertically options. Previously these were only in toolbar dropdowns. Deepens the existing context menu to cover the most common multi-select actions.
 - **Total system power draw indicator** — Toolbar status area now shows live total power consumption (e.g., "⚡ 2.4 kW") summed from all equipment with powerDraw data. Hover tooltip shows breakdown in watts and equivalent amperage at 120V/240V for circuit breaker sizing. Only appears when equipment has power specs. Inspired by electrical CAD load calculators.
 - **Node rendering error boundaries** — All node types (SignalFlow, PhysicalLayout, Group, OffsheetConnector) wrapped in React error boundaries. If a component has bad data (corrupted B&H import, malformed custom component), the node shows a red "Render Error" placeholder instead of crashing the entire app. Prevents white-screen-of-death from a single bad node. Inspired by React resilient UI patterns.
 - **Keyboard shortcuts help dialog** — Press `?` or click the keyboard icon in the toolbar to see all available shortcuts. Groups shortcuts by General, Selection & Editing, and Canvas categories with clean `<kbd>` styling. Makes all existing shortcuts discoverable. Inspired by Figma/VS Code keyboard shortcut overlays.

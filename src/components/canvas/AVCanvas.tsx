@@ -25,7 +25,7 @@ import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
-import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle } from 'lucide-react'
+import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround } from 'lucide-react'
 
 // ── Error boundary for node rendering resilience ──
 
@@ -107,6 +107,8 @@ export default function AVCanvas() {
   const pasteClipboard = useDiagramStore((s) => s.pasteClipboard)
   const selectAll = useDiagramStore((s) => s.selectAll)
   const groupSelectedNodes = useDiagramStore((s) => s.groupSelectedNodes)
+  const alignNodes = useDiagramStore((s) => s.alignNodes)
+  const distributeNodes = useDiagramStore((s) => s.distributeNodes)
   const clipboard = useDiagramStore((s) => s.clipboard)
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
@@ -440,6 +442,15 @@ export default function AVCanvas() {
                   <>
                     <div className="-mx-1 my-1 h-px bg-muted" />
                     <CtxItem icon={<Group className="w-4 h-4" />} label="Group Selection" shortcut={`${modKey}G`} onClick={() => { groupSelectedNodes(); closeMenu() }} />
+                    <div className="-mx-1 my-1 h-px bg-muted" />
+                    <CtxItem icon={<AlignCenterVertical className="w-4 h-4" />} label="Align Horizontally" onClick={() => { alignNodes('horizontal'); closeMenu() }} />
+                    <CtxItem icon={<AlignCenterHorizontal className="w-4 h-4" />} label="Align Vertically" onClick={() => { alignNodes('vertical'); closeMenu() }} />
+                    {selectedNodeCount > 2 && (
+                      <>
+                        <CtxItem icon={<AlignHorizontalSpaceAround className="w-4 h-4" />} label="Distribute Horizontally" onClick={() => { distributeNodes('horizontal'); closeMenu() }} />
+                        <CtxItem icon={<AlignVerticalSpaceAround className="w-4 h-4" />} label="Distribute Vertically" onClick={() => { distributeNodes('vertical'); closeMenu() }} />
+                      </>
+                    )}
                   </>
                 )}
                 <div className="-mx-1 my-1 h-px bg-muted" />
