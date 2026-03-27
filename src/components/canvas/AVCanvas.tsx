@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo, useEffect } from 'react'
+import { useCallback, useRef, useMemo, useEffect, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -25,6 +25,7 @@ import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
+import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize } from 'lucide-react'
 
 const nodeTypes: NodeTypes = {
   signalFlow: SignalFlowNode,
@@ -36,6 +37,14 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   avEdge: AVEdge,
 }
+
+type ContextMenu =
+  | { type: 'node'; x: number; y: number; nodeId: string }
+  | { type: 'edge'; x: number; y: number; edgeId: string }
+  | { type: 'pane'; x: number; y: number }
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
+const modKey = isMac ? '⌘' : 'Ctrl+'
 
 export default function AVCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
@@ -53,6 +62,14 @@ export default function AVCanvas() {
     deleteSelected,
   } = useDiagramStore()
   const showProductImages = useDiagramStore((s) => s.showProductImages)
+  const duplicateSelected = useDiagramStore((s) => s.duplicateSelected)
+  const copySelected = useDiagramStore((s) => s.copySelected)
+  const pasteClipboard = useDiagramStore((s) => s.pasteClipboard)
+  const selectAll = useDiagramStore((s) => s.selectAll)
+  const groupSelectedNodes = useDiagramStore((s) => s.groupSelectedNodes)
+  const clipboard = useDiagramStore((s) => s.clipboard)
+
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
 
   // Fit viewport after toggling between image/module view
   const prevShowImages = useRef(showProductImages)
@@ -211,7 +228,60 @@ export default function AVCanvas() {
     log('CANVAS', 'Deselected all (pane click)', undefined, 'debug')
     setSelectedNode(null)
     setSelectedEdge(null)
+    setContextMenu(null)
   }, [setSelectedNode, setSelectedEdge])
+
+  // ── Context menu handlers ──
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault()
+      setSelectedNode(node.id)
+      const bounds = reactFlowWrapper.current?.getBoundingClientRect()
+      if (!bounds) return
+      setContextMenu({
+        type: 'node',
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+        nodeId: node.id,
+      })
+    },
+    [setSelectedNode]
+  )
+
+  const onEdgeContextMenu = useCallback(
+    (event: React.MouseEvent, edge: Edge) => {
+      event.preventDefault()
+      setSelectedEdge(edge.id)
+      const bounds = reactFlowWrapper.current?.getBoundingClientRect()
+      if (!bounds) return
+      setContextMenu({
+        type: 'edge',
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+        edgeId: edge.id,
+      })
+    },
+    [setSelectedEdge]
+  )
+
+  const onPaneContextMenu = useCallback(
+    (event: MouseEvent | React.MouseEvent) => {
+      event.preventDefault()
+      const bounds = reactFlowWrapper.current?.getBoundingClientRect()
+      if (!bounds) return
+      setContextMenu({
+        type: 'pane',
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top,
+      })
+    },
+    []
+  )
+
+  const closeMenu = useCallback(() => setContextMenu(null), [])
+
+  const selectedNodeCount = nodes.filter((n) => n.selected).length
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -271,6 +341,9 @@ export default function AVCanvas() {
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onEdgeContextMenu={onEdgeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}
@@ -301,6 +374,68 @@ export default function AVCanvas() {
           pannable
         />
       </ReactFlow>
+
+      {/* ── Context Menu Overlay ── */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={closeMenu} onContextMenu={(e) => { e.preventDefault(); closeMenu() }} />
+          <div
+            className="absolute z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            {contextMenu.type === 'node' && (
+              <>
+                <CtxItem icon={<Copy className="w-4 h-4" />} label="Copy" shortcut={`${modKey}C`} onClick={() => { copySelected(); closeMenu() }} />
+                <CtxItem icon={<CopyPlus className="w-4 h-4" />} label="Duplicate" shortcut={`${modKey}D`} onClick={() => { duplicateSelected(); closeMenu() }} />
+                {selectedNodeCount > 1 && (
+                  <>
+                    <div className="-mx-1 my-1 h-px bg-muted" />
+                    <CtxItem icon={<Group className="w-4 h-4" />} label="Group Selection" shortcut={`${modKey}G`} onClick={() => { groupSelectedNodes(); closeMenu() }} />
+                  </>
+                )}
+                <div className="-mx-1 my-1 h-px bg-muted" />
+                <CtxItem icon={<Trash2 className="w-4 h-4 text-destructive" />} label="Delete" shortcut="⌫" className="text-destructive focus:text-destructive" onClick={() => { deleteSelected(); closeMenu() }} />
+              </>
+            )}
+            {contextMenu.type === 'edge' && (
+              <>
+                <CtxItem icon={<Trash2 className="w-4 h-4 text-destructive" />} label="Delete Cable" shortcut="⌫" className="text-destructive focus:text-destructive" onClick={() => { deleteSelected(); closeMenu() }} />
+              </>
+            )}
+            {contextMenu.type === 'pane' && (
+              <>
+                <CtxItem icon={<ClipboardPaste className="w-4 h-4" />} label="Paste" shortcut={`${modKey}V`} disabled={!clipboard || clipboard.nodes.length === 0} onClick={() => { pasteClipboard(); closeMenu() }} />
+                <CtxItem icon={<MousePointerSquareDashed className="w-4 h-4" />} label="Select All" shortcut={`${modKey}A`} onClick={() => { selectAll(); closeMenu() }} />
+                <div className="-mx-1 my-1 h-px bg-muted" />
+                <CtxItem icon={<Maximize className="w-4 h-4" />} label="Zoom to Fit" onClick={() => { fitView({ padding: 0.15, duration: 300 }); closeMenu() }} />
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+/* ── Context menu item (matches Radix DropdownMenuItem style) ── */
+
+function CtxItem({ icon, label, shortcut, disabled, className, onClick }: {
+  icon: React.ReactNode
+  label: string
+  shortcut?: string
+  disabled?: boolean
+  className?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      className={`relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 ${className ?? ''}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {icon}
+      <span className="flex-1 text-left">{label}</span>
+      {shortcut && <span className="ml-auto text-xs text-muted-foreground">{shortcut}</span>}
+    </button>
   )
 }
