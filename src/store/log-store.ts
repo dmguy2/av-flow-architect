@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type LogCategory = 'CANVAS' | 'CONNECTION' | 'STORE' | 'SCRAPE' | 'LLM' | 'PROJECT' | 'VIEW' | 'SYSTEM'
+export type LogCategory = 'CANVAS' | 'CONNECTION' | 'STORE' | 'SCRAPE' | 'LLM' | 'PROJECT' | 'VIEW' | 'SYSTEM' | '3D'
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
 export interface LogEntry {

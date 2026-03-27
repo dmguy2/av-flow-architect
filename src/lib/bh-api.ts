@@ -21,6 +21,7 @@ export interface ScrapeResult {
   specs: Record<string, Record<string, string>>
   ports: ScrapedPort[]   // flat list from LLM or regex fallback
   port_source: 'llm' | 'regex'
+  dimensions?: { width_inches: number; height_inches: number; depth_inches: number }
 }
 
 /**

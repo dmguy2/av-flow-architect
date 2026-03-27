@@ -250,6 +250,7 @@ export default function AVCanvas() {
           ...(def.images && { images: def.images }),
           ...(def.specs && { specs: def.specs }),
           ...(def.bhUrl && { bhUrl: def.bhUrl }),
+          ...(def.dimensions && { dimensions: def.dimensions }),
         },
       }
 

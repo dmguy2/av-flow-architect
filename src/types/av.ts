@@ -98,6 +98,7 @@ export interface AVComponentDef {
   deviceRole?: DeviceRole
   importSource?: 'bh' | 'manual'
   importedAt?: number
+  dimensions?: { width_inches: number; height_inches: number; depth_inches: number }
 }
 
 export interface AVNodeData {
@@ -113,6 +114,8 @@ export interface AVNodeData {
   configurableIO?: boolean
   powerDraw?: string
   deviceRole?: DeviceRole
+  /** Physical dimensions in inches for 3D scaling */
+  dimensions?: { width_inches: number; height_inches: number; depth_inches: number }
   [key: string]: unknown
 }
 
@@ -126,6 +129,7 @@ export interface AVEdgeData {
 }
 
 export type DiagramMode = 'signal-flow' | 'physical-layout'
+export type ViewMode = 'module' | 'image' | '3d'
 
 export interface ProjectPage {
   id: string
@@ -158,4 +162,5 @@ export interface AVProject {
   pages?: ProjectPage[]
   activePageId?: string
   offsheetConnectors?: OffsheetConnector[]
+  viewMode?: ViewMode
 }

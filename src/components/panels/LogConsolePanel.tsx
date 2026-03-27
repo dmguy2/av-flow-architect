@@ -13,6 +13,7 @@ const CATEGORY_COLORS: Record<LogCategory, string> = {
   PROJECT: 'text-orange-400',
   VIEW: 'text-teal-400',
   SYSTEM: 'text-slate-500',
+  '3D': 'text-yellow-500',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -20,7 +21,7 @@ const LEVEL_COLORS: Record<string, string> = {
   warn: 'text-amber-400',
 }
 
-const ALL_CATEGORIES: LogCategory[] = ['CANVAS', 'CONNECTION', 'STORE', 'SCRAPE', 'LLM', 'PROJECT', 'VIEW', 'SYSTEM']
+const ALL_CATEGORIES: LogCategory[] = ['CANVAS', 'CONNECTION', 'STORE', 'SCRAPE', 'LLM', 'PROJECT', 'VIEW', 'SYSTEM', '3D']
 
 function formatTime(ts: number): string {
   const d = new Date(ts)

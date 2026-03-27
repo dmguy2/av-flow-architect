@@ -797,6 +797,7 @@ function Model3DSection({ componentType, status, hasImage }: {
   hasImage: boolean
 }) {
   const [regenerating, setRegenerating] = useState(false)
+  const error = useDiagramStore((s) => s.model3dError[componentType])
 
   const handleRegenerate = useCallback(async () => {
     setRegenerating(true)
@@ -805,6 +806,7 @@ function Model3DSection({ componentType, status, hasImage }: {
       await deleteCachedModel(componentType)
       // Re-trigger generation via store
       const store = useDiagramStore.getState()
+      store.reset3DModelStatus(componentType)
       store.generate3DModels()
     } finally {
       setRegenerating(false)
@@ -839,6 +841,12 @@ function Model3DSection({ componentType, status, hasImage }: {
           </Button>
         )}
       </div>
+      {status === 'failed' && error && (
+        <div className="text-[10px] text-destructive bg-destructive/10 rounded px-2 py-1 flex items-start gap-1.5 border border-destructive/20">
+          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
     </div>
   )
 }

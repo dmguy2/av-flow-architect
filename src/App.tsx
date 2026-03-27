@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react'
+import { useState, useEffect, lazy, Suspense, Component, type ReactNode } from 'react'
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, AlertTriangle } from 'lucide-react'
 import Toolbar from '@/components/toolbar/Toolbar'
 import ComponentLibrary from '@/components/panels/ComponentLibrary'
 import PropertiesPanel from '@/components/panels/PropertiesPanel'
 import SignalChainPanel from '@/components/panels/SignalChainPanel'
 import AVCanvas from '@/components/canvas/AVCanvas'
+const ThreeDCanvas = lazy(() => import('@/components/canvas/ThreeDCanvas'))
 import TemplatePickerDialog from '@/components/toolbar/TemplatePickerDialog'
 import LogConsolePanel from '@/components/panels/LogConsolePanel'
 import { useDiagramStore } from '@/store/diagram-store'
@@ -15,8 +16,43 @@ import { migrateDomain } from '@/lib/domain-migration'
 import { cn } from '@/lib/utils'
 import { log } from '@/lib/logger'
 
+class ThreeDErrorBoundary extends Component<
+  { children: ReactNode; onFallback: () => void },
+  { hasError: boolean; error?: Error }
+> {
+  state = { hasError: false, error: undefined as Error | undefined }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-background">
+          <AlertTriangle className="w-10 h-10 text-destructive" />
+          <h2 className="text-lg font-semibold">3D View Crashed</h2>
+          <p className="text-sm text-muted-foreground max-w-md text-center">
+            {this.state.error?.message || 'WebGL rendering failed. Your GPU or browser may not support this feature.'}
+          </p>
+          <button
+            className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm hover:bg-primary/90"
+            onClick={() => {
+              this.setState({ hasError: false, error: undefined })
+              this.props.onFallback()
+            }}
+          >
+            Return to 2D View
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 function App() {
   const nodes = useDiagramStore((s) => s.nodes)
+  const viewMode = useDiagramStore((s) => s.viewMode)
+  const setViewMode = useDiagramStore((s) => s.setViewMode)
   const showSignalChainPanel = useDiagramStore((s) => s.showSignalChainPanel)
   const setShowSignalChainPanel = useDiagramStore((s) => s.setShowSignalChainPanel)
   const loadProject = useDiagramStore((s) => s.loadProject)
@@ -87,7 +123,19 @@ function App() {
           )}
         </button>
 
-        <AVCanvas />
+        {viewMode === '3d' ? (
+          <ThreeDErrorBoundary onFallback={() => setViewMode('module')}>
+            <Suspense fallback={
+              <div className="flex-1 flex items-center justify-center bg-background text-muted-foreground">
+                Loading 3D view...
+              </div>
+            }>
+              <ThreeDCanvas />
+            </Suspense>
+          </ThreeDErrorBoundary>
+        ) : (
+          <AVCanvas />
+        )}
 
         {/* Right toggle tab */}
         <button

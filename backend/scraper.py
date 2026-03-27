@@ -13,6 +13,7 @@ import requests
 import threading
 import os
 import signal
+import subprocess
 
 # ---------------------------------------------------------------------------
 # Persistent Chrome driver singleton
@@ -21,13 +22,65 @@ _driver = None
 _driver_lock = threading.Lock()
 
 
+def _detect_chrome_version() -> int | None:
+    """Detect the installed Chrome major version number."""
+    paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "google-chrome",
+        "chromium-browser",
+        "chromium",
+    ]
+    for path in paths:
+        try:
+            out = subprocess.check_output([path, "--version"], stderr=subprocess.DEVNULL, timeout=5)
+            match = re.search(r"(\d+)\.", out.decode())
+            if match:
+                return int(match.group(1))
+        except Exception:
+            continue
+    return None
+
+
+def _is_driver_alive(driver) -> bool:
+    """Check if a Chrome driver session is still usable."""
+    try:
+        _ = driver.title
+        return True
+    except Exception:
+        return False
+
+
 def get_driver():
-    """Return a shared Chrome driver instance, launching one if needed."""
+    """Return a shared Chrome driver instance, launching one if needed.
+    Auto-recovers if the previous driver has crashed."""
     global _driver
     with _driver_lock:
+        if _driver is not None and not _is_driver_alive(_driver):
+            # Driver crashed — clean up and recreate
+            try:
+                browser_pid = _driver.browser_pid
+            except Exception:
+                browser_pid = None
+            try:
+                _driver.quit()
+            except Exception:
+                pass
+            if browser_pid:
+                try:
+                    os.killpg(os.getpgid(browser_pid), signal.SIGTERM)
+                except (ProcessLookupError, OSError, PermissionError):
+                    pass
+            _driver = None
+
         if _driver is None:
             options = uc.ChromeOptions()
-            _driver = uc.Chrome(options=options, version_main=145)
+            options.add_argument("--incognito")
+            chrome_ver = _detect_chrome_version()
+            kwargs = {"options": options}
+            if chrome_ver:
+                kwargs["version_main"] = chrome_ver
+            _driver = uc.Chrome(**kwargs)
+            _driver.set_page_load_timeout(45)
         return _driver
 
 
@@ -36,7 +89,6 @@ def shutdown_driver():
     global _driver
     with _driver_lock:
         if _driver is not None:
-            # Grab the browser PID before quit() so we can force-kill stragglers
             browser_pid = None
             try:
                 browser_pid = _driver.browser_pid
@@ -48,8 +100,6 @@ def shutdown_driver():
             except Exception:
                 pass
 
-            # uc.Chrome.quit() often leaves zombie Chrome processes on macOS —
-            # kill the browser process group to be sure
             if browser_pid:
                 try:
                     os.killpg(os.getpgid(browser_pid), signal.SIGTERM)
@@ -58,6 +108,27 @@ def shutdown_driver():
 
             _driver = None
 
+    # Also kill any orphaned chromedriver / Chrome for Testing processes
+    # that were left behind by crashed sessions
+    _kill_orphaned_chrome()
+
+
+def _kill_orphaned_chrome():
+    """Kill any chromedriver or Chrome for Testing processes left by undetected_chromedriver."""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "chromedriver|Chrome for Testing"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for pid_str in result.stdout.strip().splitlines():
+            pid = int(pid_str.strip())
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pass
+    except Exception:
+        pass
+
 
 # ---------------------------------------------------------------------------
 # Image downloading — returns base64-encoded strings instead of saving files
@@ -65,34 +136,35 @@ def shutdown_driver():
 
 def download_images_base64(driver, image_urls: list[str], max_images: int = 4) -> list[str]:
     """Download product images and return them as base64-encoded data URIs."""
-    session = requests.Session()
     user_agent = driver.execute_script("return navigator.userAgent;")
-    session.headers.update({
-        "User-Agent": user_agent,
-        "Referer": "https://www.bhphotovideo.com/",
-    })
 
-    for cookie in driver.get_cookies():
-        session.cookies.set(cookie["name"], cookie["value"])
+    with requests.Session() as session:
+        session.headers.update({
+            "User-Agent": user_agent,
+            "Referer": "https://www.bhphotovideo.com/",
+        })
 
-    results: list[str] = []
-    for url in image_urls[:max_images]:
-        try:
-            response = session.get(url, timeout=15)
-            response.raise_for_status()
+        for cookie in driver.get_cookies():
+            session.cookies.set(cookie["name"], cookie["value"])
 
-            # Determine MIME type from URL extension
-            ext = url.split(".")[-1].split("?")[0].lower()
-            mime = {
-                "png": "image/png",
-                "webp": "image/webp",
-                "gif": "image/gif",
-            }.get(ext, "image/jpeg")
+        results: list[str] = []
+        for url in image_urls[:max_images]:
+            try:
+                response = session.get(url, timeout=15)
+                response.raise_for_status()
 
-            b64 = base64.b64encode(response.content).decode("ascii")
-            results.append(f"data:{mime};base64,{b64}")
-        except Exception:
-            pass  # skip failed downloads
+                # Determine MIME type from URL extension
+                ext = url.split(".")[-1].split("?")[0].lower()
+                mime = {
+                    "png": "image/png",
+                    "webp": "image/webp",
+                    "gif": "image/gif",
+                }.get(ext, "image/jpeg")
+
+                b64 = base64.b64encode(response.content).decode("ascii")
+                results.append(f"data:{mime};base64,{b64}")
+            except Exception:
+                pass  # skip failed downloads
 
     return results
 
@@ -133,8 +205,26 @@ def get_bh_data(driver, url: str) -> dict:
     product_name = ""
 
     try:
+        # Clear ALL session state to prevent B&H from redirecting to a stale product
+        try:
+            driver.get("about:blank")
+            driver.delete_all_cookies()
+            driver.execute_script("window.localStorage.clear(); window.sessionStorage.clear();")
+            driver.execute_cdp_cmd("Network.clearBrowserCache", {})
+            driver.execute_cdp_cmd("Network.clearBrowserCookies", {})
+        except Exception:
+            pass
+
         # --- 1. Fetch images from main product page ---
-        driver.get(base_url)
+        try:
+            driver.get(base_url)
+        except Exception as nav_err:
+            # Page load timeout or driver crash — flag the driver as dead so
+            # get_driver() auto-recovers on the next call
+            global _driver
+            with _driver_lock:
+                _driver = None
+            return {"name": "", "images": [], "specs": {}, "error": f"Browser navigation failed: {nav_err}"}
         time.sleep(5)
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -173,7 +263,12 @@ def get_bh_data(driver, url: str) -> dict:
 
         # --- 2. Fetch specs from /specs tab ---
         specs_url = base_url + "/specs"
-        driver.get(specs_url)
+        try:
+            driver.get(specs_url)
+        except Exception as nav_err:
+            # Return what we have so far — images from main page
+            return {"name": product_name, "images": images, "specs": {},
+                    "error": f"Specs page navigation failed: {nav_err}"}
         time.sleep(5)
 
         soup = BeautifulSoup(driver.page_source, "html.parser")

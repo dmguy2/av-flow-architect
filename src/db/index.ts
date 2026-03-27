@@ -11,10 +11,17 @@ interface ComponentImageRecord {
   images: Blob[]
 }
 
+interface Model3DRecord {
+  componentType: string
+  glbBlob: Blob
+  generatedAt: number
+}
+
 const db = new Dexie('AVDiagramDB') as Dexie & {
   projects: EntityTable<AVProject, 'id'>
   customComponents: EntityTable<CustomComponentRecord, 'id'>
   componentImages: EntityTable<ComponentImageRecord, 'typeSlug'>
+  models3d: EntityTable<Model3DRecord, 'componentType'>
 }
 
 db.version(1).stores({
@@ -32,5 +39,12 @@ db.version(3).stores({
   componentImages: 'typeSlug',
 })
 
+db.version(4).stores({
+  projects: 'id, name, updatedAt',
+  customComponents: '++id, type, category',
+  componentImages: 'typeSlug',
+  models3d: 'componentType',
+})
+
 export { db }
-export type { CustomComponentRecord, ComponentImageRecord }
+export type { CustomComponentRecord, ComponentImageRecord, Model3DRecord }

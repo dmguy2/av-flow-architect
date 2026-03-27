@@ -182,6 +182,7 @@ export default function ComponentLibrary() {
           images: result.images,
           specs: Object.keys(result.specs || {}).length > 0 ? result.specs : undefined,
           ...(role && { deviceRole: role }),
+          ...(result.dimensions && { dimensions: result.dimensions }),
           importSource: 'bh',
           importedAt: Date.now(),
         }

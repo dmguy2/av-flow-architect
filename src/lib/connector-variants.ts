@@ -119,6 +119,16 @@ const VARIANT_COMPAT: Record<string, VariantCompat> = {
   // Thunderbolt: TB3 ↔ TB4 backward compatible
   'thunderbolt-3|thunderbolt-4': 'compatible',
 
+  // Thunderbolt ↔ USB: Physical connector is the same for USB-C, adapters exist for others
+  'thunderbolt-3|usb-a': 'compatible',
+  'thunderbolt-3|usb-b': 'compatible',
+  'thunderbolt-3|usb-c': 'same',
+  'thunderbolt-3|usb-micro-b': 'compatible',
+  'thunderbolt-4|usb-a': 'compatible',
+  'thunderbolt-4|usb-b': 'compatible',
+  'thunderbolt-4|usb-c': 'same',
+  'thunderbolt-4|usb-micro-b': 'compatible',
+
   // DB9: RS-422 ↔ RS-232 different protocols, same physical connector
   'db9-rs232|db9-rs422': 'incompatible',
 
@@ -150,6 +160,14 @@ const ADAPTER_DESCRIPTIONS: Record<string, string> = {
   'speakon-2pole|speakon-4pole': '2-pole into 4-pole chassis (partial wiring)',
   'sdi-bnc|sdi-micro-bnc': 'BNC to Micro-BNC adapter',
   'thunderbolt-3|thunderbolt-4': 'TB3 ↔ TB4 backward compatible',
+  'thunderbolt-3|usb-a': 'Thunderbolt/USB-C to USB-A adapter',
+  'thunderbolt-3|usb-b': 'Thunderbolt/USB-C to USB-B adapter',
+  'thunderbolt-3|usb-c': 'Direct physical connection (USB-C cable)',
+  'thunderbolt-3|usb-micro-b': 'Thunderbolt/USB-C to Micro-B adapter',
+  'thunderbolt-4|usb-a': 'Thunderbolt/USB-C to USB-A adapter',
+  'thunderbolt-4|usb-b': 'Thunderbolt/USB-C to USB-B adapter',
+  'thunderbolt-4|usb-c': 'Direct physical connection (USB-C cable)',
+  'thunderbolt-4|usb-micro-b': 'Thunderbolt/USB-C to Micro-B adapter',
   'displayport-full|displayport-mini': 'DisplayPort to Mini-DisplayPort adapter',
 }
 

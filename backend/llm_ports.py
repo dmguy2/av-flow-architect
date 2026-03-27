@@ -1,7 +1,7 @@
 """
-LLM-based port extraction using a local Ollama model.
+LLM-based port extraction using Gemini API (preferred) or local Ollama model.
 Manages Ollama lifecycle (start/stop) and sends product specs
-to a small model for accurate I/O port identification.
+to a model for accurate I/O port identification.
 """
 
 import subprocess
@@ -16,7 +16,19 @@ import os
 OLLAMA_URL = "http://localhost:11434"
 MODEL_NAME = "qwen2.5:14b"
 
+# Gemini API — dramatically better extraction than local models
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
 _ollama_process = None
+
+# Patterns that indicate a label is a description, not a port name
+_DESCRIPTION_PATTERN = re.compile(
+    r'\b(?:total|supporting|up to|features?|including|capable|maximum|'
+    r'compliant|compatible|bandwidth|throughput|speeds?|rates?)\b',
+    re.IGNORECASE,
+)
 
 # ---------------------------------------------------------------------------
 # Ollama lifecycle
@@ -167,6 +179,11 @@ DIRECTION: input, output, or bidirectional
   - If device type is unclear, use "bidirectional"
 
 REMEMBER: Every device has a power input. If specs mention power supply, wattage, or power draw, include a single power input port (connector "powercon", domain "power", direction "input").
+
+PORT LABELS:
+- Labels must be SHORT names for specific physical connectors (e.g. "HDMI Input", "RJ45 Ethernet", "USB-C", "Power").
+- NEVER use a sentence or description as a label. BAD: "8 Total Connections Supporting up to Gigabit Ethernet". GOOD: "RJ45 Gigabit Ethernet".
+- NEVER include quantities, speeds, or capabilities in the label. Use the "qty" field for quantities.
 
 Return a JSON object with a "ports" array. Only include ports you can directly point to in the specs text.
 {"ports":[{"qty":4,"label":"HDMI Input","connector":"hdmi","variant":"hdmi-full","domain":"video","direction":"input"},{"qty":1,"label":"Ethernet","connector":"ethernet","variant":"ethernet-rj45","domain":"network","direction":"bidirectional"}]}
@@ -744,10 +761,18 @@ def _validate_ports_against_specs(ports: list[dict], specs_text: str) -> list[di
     """
     Filter out hallucinated ports by checking if the connector type
     has supporting evidence in the original spec text.
+    Also filters out description-like labels that aren't real port names.
     """
     specs_lower = specs_text.lower()
+
     validated = []
     for port in ports:
+        label = str(port.get("label", ""))
+
+        # Filter out description-like labels
+        if len(label) > 50 or _DESCRIPTION_PATTERN.search(label):
+            continue
+
         connector = port.get("connector", "")
         evidence_keywords = CONNECTOR_EVIDENCE.get(connector, [])
         # If we have no evidence mapping, keep the port (unknown connector)
@@ -758,7 +783,51 @@ def _validate_ports_against_specs(ports: list[dict], specs_text: str) -> list[di
         if any(kw in specs_lower for kw in evidence_keywords):
             validated.append(port)
         # else: hallucinated port, drop it
+
+    # Auto-add power port if specs mention power but LLM didn't include one
+    has_power = any(p.get("domain") == "power" for p in validated)
+    if not has_power:
+        power_keywords = ["power supply", "power draw", "watt", "power consumption",
+                          "power adapter", "ac adapter", "dc power", "external power",
+                          "power input", "iec", "powercon", "ac input"]
+        if any(kw in specs_lower for kw in power_keywords):
+            validated.append({
+                "qty": 1,
+                "label": "Power",
+                "connector": "powercon",
+                "domain": "power",
+                "direction": "input",
+            })
+
     return validated
+
+
+def _call_gemini(prompt: str) -> str | None:
+    """Call Gemini API and return the response text, or None on failure."""
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        r = requests.post(
+            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0,
+                    "maxOutputTokens": 2048,
+                },
+            },
+            timeout=30,
+        )
+        if not r.ok:
+            print(f"Gemini API error: {r.status_code} {r.text[:200]}")
+            return None
+        data = r.json()
+        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+        return text.strip() if text else None
+    except Exception as e:
+        print(f"Gemini request failed: {e}")
+        return None
 
 
 def extract_ports_with_llm(specs: dict, product_name: str = "") -> list[dict] | None:
@@ -774,18 +843,12 @@ def extract_ports_with_llm(specs: dict, product_name: str = "") -> list[dict] | 
         return det_ports
 
     # Try labeled I/O extraction (reliable for hubs and complex adapters)
+    # Only trust it if it finds 3+ ports — fewer means it likely missed most ports
     labeled_ports = _extract_labeled_io_ports(specs, product_name=product_name)
-    if labeled_ports:
+    if labeled_ports and len(labeled_ports) >= 3:
         return labeled_ports
 
     # No deterministic matches — use LLM for complex products
-    # Start Ollama if needed
-    if not start_ollama():
-        return None
-
-    # Ensure model is available
-    if not ensure_model():
-        return None
 
     # Filter to I/O-relevant categories to reduce noise and avoid duplicates
     io_categories = _filter_io_categories(specs)
@@ -803,28 +866,49 @@ def extract_ports_with_llm(specs: dict, product_name: str = "") -> list[dict] | 
 
     prompt = EXTRACTION_PROMPT + specs_text
 
-    try:
-        r = requests.post(
-            f"{OLLAMA_URL}/api/generate",
-            json={
-                "model": MODEL_NAME,
-                "prompt": prompt,
-                "format": "json",
-                "stream": False,
-                "keep_alive": "5m",
-                "options": {
-                    "temperature": 0,
-                    "num_predict": 2048,
-                },
-            },
-            timeout=120,
-        )
+    # Try Gemini first (dramatically better accuracy), fall back to Ollama
+    response_text = None
 
-        if not r.ok:
+    if GEMINI_API_KEY:
+        print(f"[LLM] Using Gemini ({GEMINI_MODEL}) for port extraction...")
+        response_text = _call_gemini(prompt)
+        if response_text:
+            print(f"[LLM] Gemini returned {len(response_text)} chars")
+
+    if not response_text:
+        # Fall back to local Ollama
+        print(f"[LLM] {'Gemini unavailable, falling' if GEMINI_API_KEY else 'No GEMINI_API_KEY, falling'} back to Ollama ({MODEL_NAME})...")
+        if not start_ollama():
+            return None
+        if not ensure_model():
             return None
 
-        response_text = r.json().get("response", "").strip()
+        try:
+            r = requests.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": MODEL_NAME,
+                    "prompt": prompt,
+                    "format": "json",
+                    "stream": False,
+                    "keep_alive": "5m",
+                    "options": {
+                        "temperature": 0,
+                        "num_predict": 2048,
+                    },
+                },
+                timeout=120,
+            )
+            if not r.ok:
+                return None
+            response_text = r.json().get("response", "").strip()
+        except requests.RequestException:
+            return None
 
+    if not response_text:
+        return None
+
+    try:
         # Repair common JSON issues from small models:
         # unescaped quotes inside string values like 1/4" TRS
         response_text = _repair_json(response_text)

@@ -21,6 +21,8 @@ import { generateId } from '@/lib/utils'
 import { db } from '@/db'
 import { log } from '@/lib/logger'
 
+type Model3DStatus = 'pending' | 'generating' | 'ready' | 'failed'
+
 interface HistorySnapshot {
   nodes: Node<AVNodeData>[]
   edges: Edge<AVEdgeData>[]
@@ -120,7 +122,9 @@ interface DiagramState {
 
   // 3D model state
   model3dUrls: Record<string, string>
-  model3dStatus: Record<string, string>
+  model3dStatus: Record<string, Model3DStatus>
+  model3dError: Record<string, string>
+  reset3DModelStatus: (componentType: string) => void
   generate3DModels: () => Promise<void>
   toggleLayerVisibility: (domain: SignalDomain) => void
   setFocusedLayer: (domain: SignalDomain | null) => void
@@ -174,6 +178,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   // 3D model state
   model3dUrls: {},
   model3dStatus: {},
+  model3dError: {},
 
   // Signal chain analysis
   signalChains: [],
@@ -1008,60 +1013,105 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }
   },
 
+  reset3DModelStatus: (componentType) => {
+    set((s) => ({
+      model3dStatus: { ...s.model3dStatus, [componentType]: 'pending' },
+      model3dUrls: { ...s.model3dUrls, [componentType]: '' },
+      model3dError: { ...s.model3dError, [componentType]: '' },
+    }))
+  },
+
   generate3DModels: async () => {
     const { nodes } = get()
+
+    // Check if 3D AI Studio API is available (has key configured)
+    const { check3DAvailable } = await import('@/lib/threedai-api')
+    const apiAvailable = await check3DAvailable()
+
+    if (!apiAvailable) {
+      log('3D', 'Using procedural 3D shapes (no THREEDAI_API_KEY configured)')
+      // Procedural shapes render automatically — no generation needed
+      return
+    }
+
     const { getComponentDef } = await import('@/data/component-definitions')
-    const uniqueTypes = new Map<string, string>()
+    const uniqueTypes = new Map<string, { image: string; prompt: string }>()
+
     for (const n of nodes) {
       if ((n.type === 'signalFlow' || n.type === 'physicalLayout') && !uniqueTypes.has(n.data.componentType)) {
-        // Try node image first, then fall back to component definition
         const image = n.data.image || getComponentDef(n.data.componentType)?.images?.[0]
         if (image) {
-          uniqueTypes.set(n.data.componentType, image)
+          // Construct a guiding prompt based on the component's role and label
+          let prompt = n.data.label
+          const role = n.data.deviceRole
+          const label = n.data.label.toLowerCase()
+
+          if (label.includes('tv') || label.includes('display') || label.includes('monitor') || label.includes('oled')) {
+            prompt = `A flat screen television monitor, ${n.data.label}`
+          } else if (label.includes('laptop') || label.includes('macbook')) {
+            prompt = `A laptop computer, ${n.data.label}`
+          } else if (label.includes('camera') || label.includes('owl')) {
+            prompt = `A digital camera device, ${n.data.label}`
+          } else if (label.includes('adapter') || label.includes('hub') || label.includes('satechi')) {
+            prompt = `A small USB-C hub adapter with a cable, ${n.data.label}`
+          } else if (role === 'destination' && (label.includes('speaker') || label.includes('sub'))) {
+            prompt = `A speaker cabinet, ${n.data.label}`
+          }
+
+          uniqueTypes.set(n.data.componentType, { image, prompt })
         }
       }
     }
 
     if (uniqueTypes.size === 0) {
-      log('3D', 'No components with images to generate')
+      log('3D', 'No components with images for AI generation')
       return
     }
 
-    log('3D', `Generating 3D models for ${uniqueTypes.size} component type(s)`)
+    log('3D', `Generating AI 3D models for ${uniqueTypes.size} component type(s)`)
 
-    // Import dynamically to avoid circular deps
     const { getOrGenerate3DModel } = await import('@/lib/model3d-manager')
 
-    // Process with 20s spacing to respect 3 req/min rate limit
     const entries = Array.from(uniqueTypes.entries())
+    const RATE_LIMIT_MS = 20_000
+    let lastSubmitTime = 0
+
     for (let i = 0; i < entries.length; i++) {
-      const [compType, image] = entries[i]
+      const [compType, { image, prompt }] = entries[i]
       const currentStatus = get().model3dStatus[compType]
-      if (currentStatus === 'ready' || currentStatus === 'generating') continue
+      if (currentStatus === 'ready' || currentStatus === 'generating' || currentStatus === 'failed') continue
+
+      // Respect rate limit: ensure at least 20s between submission starts
+      if (lastSubmitTime > 0) {
+        const elapsed = Date.now() - lastSubmitTime
+        if (elapsed < RATE_LIMIT_MS) {
+          await new Promise((r) => setTimeout(r, RATE_LIMIT_MS - elapsed))
+        }
+      }
+
+      lastSubmitTime = Date.now()
 
       set((s) => ({
         model3dStatus: { ...s.model3dStatus, [compType]: 'generating' },
+        model3dError: { ...s.model3dError, [compType]: '' },
       }))
 
       try {
-        const url = await getOrGenerate3DModel(compType, image, (status) => {
+        const url = await getOrGenerate3DModel(compType, image, prompt, (status) => {
           log('3D', `${compType}: ${status}`, undefined, 'debug')
         })
         set((s) => ({
           model3dUrls: { ...s.model3dUrls, [compType]: url },
           model3dStatus: { ...s.model3dStatus, [compType]: 'ready' },
         }))
-        log('3D', `Model ready: ${compType}`)
+        log('3D', `AI model ready: ${compType}`)
       } catch (err) {
+        const msg = String(err).replace(/^Error:\s*/, '')
         set((s) => ({
           model3dStatus: { ...s.model3dStatus, [compType]: 'failed' },
+          model3dError: { ...s.model3dError, [compType]: msg },
         }))
-        log('3D', `Model failed: ${compType}`, String(err), 'error')
-      }
-
-      // Rate limit spacing (skip delay after last item)
-      if (i < entries.length - 1) {
-        await new Promise((r) => setTimeout(r, 20_000))
+        log('3D', `AI model failed: ${compType} — using procedural shape`, msg, 'warn')
       }
     }
   },
