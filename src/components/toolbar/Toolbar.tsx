@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box, Keyboard, Zap } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Undo2, Redo2, Moon, Sun, Cable, Save, Group, Copy, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, AlignCenterHorizontal, AlignCenterVertical, Activity, Image, Box, Keyboard, Zap, Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -27,6 +27,7 @@ const SHORTCUT_GROUPS = [
       { keys: `${MOD}S`, action: 'Save project' },
       { keys: `${MOD}Z`, action: 'Undo' },
       { keys: `${MOD}⇧Z`, action: 'Redo' },
+      { keys: `${MOD}F`, action: 'Find device' },
       { keys: '?', action: 'Show keyboard shortcuts' },
     ],
   },
@@ -84,6 +85,10 @@ export default function Toolbar() {
 
   const selectedCount = nodes.filter((n) => n.selected && n.type !== 'group').length
   const [showShortcuts, setShowShortcuts] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const focusNode = useDiagramStore((s) => s.focusNode)
 
   // Total system power draw
   const totalPowerW = useMemo(() => {
@@ -96,6 +101,20 @@ export default function Toolbar() {
     }
     return total
   }, [nodes])
+
+  // Node search results
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return []
+    const q = searchQuery.toLowerCase()
+    return nodes
+      .filter((n) => n.type !== 'group' && (
+        n.data.label.toLowerCase().includes(q) ||
+        n.data.componentType.toLowerCase().includes(q) ||
+        (n.data.manufacturer && n.data.manufacturer.toLowerCase().includes(q)) ||
+        (n.data.model && n.data.model.toLowerCase().includes(q))
+      ))
+      .slice(0, 8)
+  }, [searchQuery, nodes])
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -142,8 +161,17 @@ export default function Toolbar() {
       if (e.key === '?' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
         setShowShortcuts(true)
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        setShowSearch(true)
+        setSearchQuery('')
+        setTimeout(() => searchInputRef.current?.focus(), 50)
+      }
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false)
+      }
     },
-    [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll]
+    [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll, showSearch]
   )
 
   useEffect(() => {
@@ -181,7 +209,7 @@ export default function Toolbar() {
   }, [darkMode])
 
   return (
-    <div className="h-11 border-b border-border bg-card flex items-center px-3 gap-1.5 shrink-0">
+    <div className="relative h-11 border-b border-border bg-card flex items-center px-3 gap-1.5 shrink-0">
       {/* Project name */}
       <Input
         value={projectName}
@@ -475,6 +503,52 @@ export default function Toolbar() {
         </TooltipTrigger>
         <TooltipContent>{darkMode ? 'Light mode' : 'Dark mode'}</TooltipContent>
       </Tooltip>
+
+      {/* Node search overlay */}
+      {showSearch && (
+        <div className="absolute right-3 top-full mt-1 z-50 w-72 rounded-md border bg-popover shadow-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b">
+            <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setShowSearch(false)
+                if (e.key === 'Enter' && searchResults.length > 0) {
+                  focusNode(searchResults[0].id)
+                  setShowSearch(false)
+                }
+              }}
+              placeholder="Search devices..."
+              className="flex-1 text-xs bg-transparent outline-none placeholder:text-muted-foreground"
+            />
+            <button onClick={() => setShowSearch(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {searchQuery && (
+            <div className="max-h-48 overflow-y-auto">
+              {searchResults.length === 0 ? (
+                <div className="px-3 py-3 text-xs text-muted-foreground text-center">No matching devices</div>
+              ) : (
+                searchResults.map((node) => (
+                  <button
+                    key={node.id}
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent transition-colors flex items-center justify-between"
+                    onClick={() => { focusNode(node.id); setShowSearch(false) }}
+                  >
+                    <span className="font-medium truncate">{node.data.label}</span>
+                    <span className="text-[10px] text-muted-foreground shrink-0 ml-2">
+                      {node.data.componentType.replace(/-/g, ' ')}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
