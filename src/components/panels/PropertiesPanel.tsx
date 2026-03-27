@@ -117,16 +117,40 @@ export default function PropertiesPanel() {
             {/* Connection info */}
             <div className="space-y-2">
               <Label className="text-xs">Route</Label>
-              <div className="text-[11px] space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">From:</span>
-                  <span className="font-medium">{sourceNode?.data.label ?? 'Unknown'}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">To:</span>
-                  <span className="font-medium">{targetNode?.data.label ?? 'Unknown'}</span>
-                </div>
-              </div>
+              {(() => {
+                const srcPortId = selectedEdge.sourceHandle?.replace(/-(?:target|source)$/, '')
+                const tgtPortId = selectedEdge.targetHandle?.replace(/-(?:target|source)$/, '')
+                const srcPort = sourceNode?.data.ports.find((p: AVPort) => p.id === srcPortId)
+                const tgtPort = targetNode?.data.ports.find((p: AVPort) => p.id === tgtPortId)
+                return (
+                  <div className="text-[11px] space-y-1.5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground shrink-0">From:</span>
+                        <span className="font-medium truncate">{sourceNode?.data.label ?? 'Unknown'}</span>
+                      </div>
+                      {srcPort && (
+                        <div className="text-[10px] text-muted-foreground pl-[38px]">
+                          {srcPort.label}
+                          <span className="text-muted-foreground/50 ml-1">({(edgeData?.connector ?? srcPort.connector).toUpperCase()})</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground shrink-0">To:</span>
+                        <span className="font-medium truncate">{targetNode?.data.label ?? 'Unknown'}</span>
+                      </div>
+                      {tgtPort && (
+                        <div className="text-[10px] text-muted-foreground pl-[38px]">
+                          {tgtPort.label}
+                          <span className="text-muted-foreground/50 ml-1">({tgtPort.connector.toUpperCase()})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Connection warning */}
