@@ -557,3 +557,79 @@ function drawEquipmentList(
 
   drawFooter(pdf, pageNum, margin, margin * 2 + contentW, pageH)
 }
+
+// ─── CSV Cable Schedule Export ───
+
+function csvEscape(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+export function exportCableScheduleCsv(
+  projectName: string,
+  nodes: Node<AVNodeData>[],
+  edges: Edge<AVEdgeData>[]
+): void {
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+
+  const headers = ['#', 'Cable ID', 'Source', 'Source Port', 'Destination', 'Dest Port', 'Signal', 'Connector']
+  const rows = edges.map((edge, idx) => {
+    const sourceNode = nodeMap.get(edge.source)
+    const targetNode = nodeMap.get(edge.target)
+    const sourcePort = sourceNode?.data.ports.find((p) => p.id === edge.sourceHandle)
+    const targetPort = targetNode?.data.ports.find((p) => p.id === edge.targetHandle)
+
+    return [
+      `${idx + 1}`,
+      edge.data?.label || `C-${String(idx + 1).padStart(2, '0')}`,
+      sourceNode?.data.label ?? '',
+      sourcePort?.label ?? '',
+      targetNode?.data.label ?? '',
+      targetPort?.label ?? '',
+      SIGNAL_LABELS[edge.data?.domain ?? 'audio'],
+      (edge.data?.connector ?? 'xlr').toUpperCase(),
+    ]
+  })
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map(csvEscape).join(','))
+    .join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${projectName} - Cable Schedule.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+export function exportEquipmentListCsv(
+  projectName: string,
+  nodes: Node<AVNodeData>[]
+): void {
+  const equipment = nodes.filter((n) => n.type !== 'group')
+
+  const headers = ['#', 'Label', 'Type', 'Manufacturer', 'Model', 'Power Draw', 'Notes']
+  const rows = equipment.map((node, idx) => [
+    `${idx + 1}`,
+    node.data.label,
+    node.data.componentType.replace(/-/g, ' '),
+    node.data.manufacturer ?? '',
+    node.data.model ?? '',
+    node.data.powerDraw ?? '',
+    node.data.notes ?? '',
+  ])
+
+  const csv = [headers, ...rows]
+    .map((row) => row.map(csvEscape).join(','))
+    .join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `${projectName} - Equipment List.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}

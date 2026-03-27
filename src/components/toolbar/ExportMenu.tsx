@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Download, Image, FileText, FileCode, Upload, FileDown, Printer } from 'lucide-react'
+import { Download, Image, FileText, FileCode, Upload, FileDown, Printer, Table } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { useDiagramStore } from '@/store/diagram-store'
-import { exportPng, exportSvg, exportPdf, exportPrintPdf } from '@/lib/export'
+import { exportPng, exportSvg, exportPdf, exportPrintPdf, exportCableScheduleCsv, exportEquipmentListCsv } from '@/lib/export'
 
 export default function ExportMenu() {
   const projectName = useDiagramStore((s) => s.projectName)
@@ -63,6 +63,15 @@ export default function ExportMenu() {
           <DropdownMenuItem onClick={() => exportPrintPdf({ projectName, nodes, edges })}>
             <Printer className="w-4 h-4" />
             Print PDF (with cable schedule)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => exportCableScheduleCsv(projectName, nodes, edges)}>
+            <Table className="w-4 h-4" />
+            Cable Schedule (CSV)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => exportEquipmentListCsv(projectName, nodes)}>
+            <Table className="w-4 h-4" />
+            Equipment List (CSV)
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={exportProjectFile}>
