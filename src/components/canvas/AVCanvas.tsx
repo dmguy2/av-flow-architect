@@ -25,7 +25,7 @@ import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
-import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround } from 'lucide-react'
+import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, Tag } from 'lucide-react'
 
 // ── Error boundary for node rendering resilience ──
 
@@ -109,6 +109,7 @@ export default function AVCanvas() {
   const groupSelectedNodes = useDiagramStore((s) => s.groupSelectedNodes)
   const alignNodes = useDiagramStore((s) => s.alignNodes)
   const distributeNodes = useDiagramStore((s) => s.distributeNodes)
+  const setEditingEdge = useDiagramStore((s) => s.setEditingEdge)
   const clipboard = useDiagramStore((s) => s.clipboard)
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
@@ -459,6 +460,8 @@ export default function AVCanvas() {
             )}
             {contextMenu.type === 'edge' && (
               <>
+                <CtxItem icon={<Tag className="w-4 h-4" />} label="Rename Cable" onClick={() => { setEditingEdge(contextMenu.edgeId); closeMenu() }} />
+                <div className="-mx-1 my-1 h-px bg-muted" />
                 <CtxItem icon={<Trash2 className="w-4 h-4 text-destructive" />} label="Delete Cable" shortcut="⌫" className="text-destructive focus:text-destructive" onClick={() => { deleteSelected(); closeMenu() }} />
               </>
             )}

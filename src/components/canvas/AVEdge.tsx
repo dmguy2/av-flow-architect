@@ -32,12 +32,22 @@ function AVEdge({
   const focusedLayer = useDiagramStore((s) => s.focusedLayer)
   const showEdgeLabels = useDiagramStore((s) => s.showEdgeLabels)
   const showProductImages = useDiagramStore((s) => s.showProductImages)
+  const editingEdgeId = useDiagramStore((s) => s.editingEdgeId)
+  const setEditingEdge = useDiagramStore((s) => s.setEditingEdge)
 
   const domain = data?.domain ?? 'audio'
 
   useEffect(() => {
     setLabelText(data?.label ?? '')
   }, [data?.label])
+
+  // Enter edit mode when triggered from store (e.g., context menu "Rename Cable")
+  useEffect(() => {
+    if (editingEdgeId === id && !editing) {
+      setEditing(true)
+      setEditingEdge(null)
+    }
+  }, [editingEdgeId, id, editing, setEditingEdge])
 
   useEffect(() => {
     if (editing && inputRef.current) {

@@ -89,6 +89,8 @@ interface DiagramState {
   updateEdgeData: (edgeId: string, data: Partial<AVEdgeData>) => void
   selectedEdgeId: string | null
   setSelectedEdge: (id: string | null) => void
+  editingEdgeId: string | null
+  setEditingEdge: (id: string | null) => void
 
   // Bulk operations
   duplicateSelected: () => void
@@ -152,6 +154,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   edges: [],
   selectedNodeId: null,
   selectedEdgeId: null,
+  editingEdgeId: null,
 
   past: [],
   future: [],
@@ -321,6 +324,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
+  setEditingEdge: (id) => set({ editingEdgeId: id }),
 
   updateNodeData: (nodeId, data) => {
     const { pushHistory, nodes } = get()
