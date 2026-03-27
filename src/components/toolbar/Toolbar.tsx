@@ -40,6 +40,7 @@ const SHORTCUT_GROUPS = [
       { keys: `${MOD}D`, action: 'Duplicate selected' },
       { keys: `${MOD}G`, action: 'Group selected nodes' },
       { keys: 'Delete', action: 'Delete selected' },
+      { keys: 'Escape', action: 'Deselect all' },
       { keys: 'Double-click', action: 'Edit node/edge label' },
     ],
   },
@@ -167,8 +168,17 @@ export default function Toolbar() {
         setSearchQuery('')
         setTimeout(() => searchInputRef.current?.focus(), 50)
       }
-      if (e.key === 'Escape' && showSearch) {
-        setShowSearch(false)
+      if (e.key === 'Escape') {
+        if (showSearch) {
+          setShowSearch(false)
+        } else if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+          // Deselect all nodes and edges
+          const s = useDiagramStore.getState()
+          if (s.selectedNodeId || s.selectedEdgeId) {
+            s.setSelectedNode(null)
+            s.setSelectedEdge(null)
+          }
+        }
       }
     },
     [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll, showSearch]
