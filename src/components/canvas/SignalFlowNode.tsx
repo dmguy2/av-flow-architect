@@ -8,6 +8,16 @@ import { getComponentDef } from '@/data/component-definitions'
 import { cn } from '@/lib/utils'
 import { useDiagramStore } from '@/store/diagram-store'
 
+import type { ConnectorType } from '@/types/av'
+
+const CONNECTOR_SHORT: Record<ConnectorType, string> = {
+  xlr: 'XLR', trs: 'TRS', rca: 'RCA', hdmi: 'HDMI', sdi: 'SDI',
+  ethernet: 'ETH', dante: 'DTE', usb: 'USB', speakon: 'SPK',
+  powercon: 'PWR', dmx: 'DMX', fiber: 'FBR', aes50: 'AES', ndi: 'NDI',
+  wifi: 'WiFi', thunderbolt: 'TB', db9: 'DB9', bnc: 'BNC',
+  displayport: 'DP', sd: 'SD',
+}
+
 type SignalFlowNodeType = Node<AVNodeData, 'signalFlow'>
 
 function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
@@ -268,6 +278,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
               {inp && (
                 <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
                   {inp.label}
+                  <span className="text-[7px] text-muted-foreground/40 font-medium">{CONNECTOR_SHORT[inp.connector]}</span>
                   {inp.conferenceRole && (
                     <span
                       className="text-[7px] font-bold px-1 py-0.5 rounded leading-none"
@@ -296,6 +307,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
                     </span>
                   )}
                   {out.label}
+                  <span className="text-[7px] text-muted-foreground/40 font-medium">{CONNECTOR_SHORT[out.connector]}</span>
                 </span>
               )}
             </div>
@@ -305,6 +317,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
             <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
               ↔ {port.label}
+              <span className="text-[7px] text-muted-foreground/40 font-medium">{CONNECTOR_SHORT[port.connector]}</span>
               {port.conferenceRole && (
                 <span
                   className="text-[7px] font-bold px-1 py-0.5 rounded leading-none"
@@ -323,6 +336,7 @@ function SignalFlowNode({ data, selected, id }: NodeProps<SignalFlowNodeType>) {
           <div key={port.id} className="flex items-center h-6 pl-3 pr-3">
             <span className="text-[10px] text-muted-foreground whitespace-nowrap italic flex items-center gap-1">
               ? {port.label}
+              <span className="text-[7px] text-muted-foreground/40 font-medium not-italic">{CONNECTOR_SHORT[port.connector]}</span>
               {port.conferenceRole && (
                 <span
                   className="text-[7px] font-bold px-1 py-0.5 rounded leading-none not-italic"

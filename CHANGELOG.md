@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Connector type labels on ports** — Every port on every node now shows a tiny connector type abbreviation (XLR, HDMI, ETH, DTE, SDI, etc.) next to the port label. AV designers can immediately see what physical connector each port uses without clicking into properties. Styled at 7px in very muted color to avoid visual clutter. Inspired by Q-SYS Designer and Crestron D3 Pro port labeling conventions.
 - **Recently used components** — Component library shows a "Recent" section at the top with the last 6 components you placed on the canvas. Persists across sessions via localStorage. Hidden during search. Saves repeated scrolling when placing multiple copies of the same gear.
 - **Double-click to edit node labels** — Double-click any equipment node's label to rename it inline. Works in both module view and image view. Enter to commit, Escape to cancel. Follows the same pattern as GroupNode and AVEdge inline editing. Inspired by draw.io/Figma double-click-to-edit convention.
 - **CSV cable schedule & equipment list export** — New Export menu options: "Cable Schedule (CSV)" and "Equipment List (CSV)" generate spreadsheet-ready files with all connections/equipment. Essential for bid documents, pull sheets, and inventory management. Inspired by AVIXA cable scheduling standards.
