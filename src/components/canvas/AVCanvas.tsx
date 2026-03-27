@@ -4,6 +4,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   BackgroundVariant,
   ConnectionMode,
   useReactFlow,
@@ -20,7 +21,8 @@ import ConnectionLine from './ConnectionLine'
 import { useDiagramStore } from '@/store/diagram-store'
 import { getComponentDef } from '@/data/component-definitions'
 import { generateId } from '@/lib/utils'
-import { SIGNAL_Z_ORDER } from '@/lib/signal-colors'
+import { SIGNAL_Z_ORDER, SIGNAL_COLORS, SIGNAL_LABELS } from '@/lib/signal-colors'
+import type { SignalDomain } from '@/types/av'
 import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
@@ -186,6 +188,13 @@ export default function AVCanvas() {
       const zB = SIGNAL_Z_ORDER[b.data?.domain ?? 'audio'] ?? 2
       return zA - zB
     })
+  }, [edges])
+
+  // Signal domains in use (for legend)
+  const usedDomains = useMemo(() => {
+    const set = new Set<SignalDomain>()
+    for (const e of edges) if (e.data?.domain) set.add(e.data.domain)
+    return Array.from(set)
   }, [edges])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -438,6 +447,18 @@ export default function AVCanvas() {
           zoomable
           pannable
         />
+        {usedDomains.length > 0 && !showProductImages && (
+          <Panel position="bottom-left" className="!mb-1 !ml-1">
+            <div className="flex items-center gap-2.5 px-2 py-1 rounded bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm">
+              {usedDomains.map((domain) => (
+                <div key={domain} className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: SIGNAL_COLORS[domain] }} />
+                  <span className="text-[9px] text-muted-foreground">{SIGNAL_LABELS[domain]}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
 
       {/* ── Context Menu Overlay ── */}

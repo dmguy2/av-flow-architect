@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Signal domain legend on canvas** — A compact color legend appears at the bottom-left of the canvas showing which signal domains are in use (e.g., 🔵 Audio 🟢 Video 🟡 Network). Only visible when edges exist, hidden in image view. Semi-transparent with backdrop blur. Makes screenshots and shared screens self-explanatory. Inspired by professional schematic drawing conventions.
 - **Ctrl+F node search** — Press Ctrl+F (or Cmd+F) to open a search overlay that finds devices by name, type, manufacturer, or model. Click a result or press Enter to zoom directly to it. Capped at 8 results, searches as you type. Essential for navigating large diagrams. Also added to keyboard shortcuts help dialog. Inspired by Figma's Ctrl+F search.
 - **Connected node highlighting on edge selection** — When you select a cable, the two equipment nodes it connects get a subtle domain-colored glow. Makes it instantly clear which devices a cable links in dense diagrams with many overlapping connections. Works in both module view and image view. Uses an optimized store selector per node.
 - **System summary dashboard** — When no node/edge is selected, the Properties Panel now shows a live system summary: equipment count by device role (sources, processors, destinations, infrastructure), cable count by signal domain with color dots, total power draw with amperage, and validation status (errors/warnings or "No issues"). Turns dead UI space into a useful at-a-glance overview. Empty diagrams show "Drag equipment from the library to start designing."
