@@ -36,6 +36,7 @@ export default function SignalChainPanel({ onClose }: { onClose: () => void }) {
     runSignalChainAnalysis,
     runLLMAnalysis,
     clearChainAnalysis,
+    focusNode,
   } = useDiagramStore()
 
   const hasResults = signalChains.length > 0 || chainIssues.length > 0
@@ -110,8 +111,18 @@ export default function SignalChainPanel({ onClose }: { onClose: () => void }) {
                   <div className="text-[11px] font-medium truncate">
                     {chain.sourceLabel} → {chain.destLabel}
                   </div>
-                  <div className="text-[10px] text-muted-foreground truncate">
-                    {chain.path.map((n) => n.label).join(' → ')}
+                  <div className="text-[10px] text-muted-foreground flex flex-wrap gap-0.5 items-center">
+                    {chain.path.map((n, i) => (
+                      <span key={n.nodeId}>
+                        {i > 0 && <span className="mx-0.5">→</span>}
+                        <button
+                          className="hover:text-foreground hover:underline transition-colors"
+                          onClick={(e) => { e.stopPropagation(); focusNode(n.nodeId) }}
+                        >
+                          {n.label}
+                        </button>
+                      </span>
+                    ))}
                   </div>
                   <Button
                     size="sm"
@@ -162,10 +173,12 @@ export default function SignalChainPanel({ onClose }: { onClose: () => void }) {
               {allIssues.map((issue, idx) => {
                 const style = SEVERITY_STYLES[issue.severity] ?? SEVERITY_STYLES.info
                 const Icon = style.icon
+                const clickableNodeId = 'affectedNodes' in issue && (issue as { affectedNodes?: string[] }).affectedNodes?.[0]
                 return (
                   <div
                     key={idx}
-                    className={`rounded-md border ${style.border} ${style.bg} px-2 py-1.5 space-y-0.5`}
+                    className={`rounded-md border ${style.border} ${style.bg} px-2 py-1.5 space-y-0.5 ${clickableNodeId ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+                    onClick={() => clickableNodeId && focusNode(clickableNodeId)}
                   >
                     <div className="flex items-start gap-1.5">
                       <Icon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${style.text}`} />

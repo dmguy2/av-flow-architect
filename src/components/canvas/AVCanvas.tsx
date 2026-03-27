@@ -88,7 +88,7 @@ const modKey = isMac ? '⌘' : 'Ctrl+'
 
 export default function AVCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
-  const { fitView } = useReactFlow()
+  const { fitView, setCenter } = useReactFlow()
   const {
     nodes,
     edges,
@@ -113,6 +113,19 @@ export default function AVCanvas() {
   const clipboard = useDiagramStore((s) => s.clipboard)
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const focusNodeId = useDiagramStore((s) => s.focusNodeId)
+
+  // Zoom to node when focusNodeId is set (e.g., clicking issue in Signal Chain Panel)
+  useEffect(() => {
+    if (!focusNodeId) return
+    const node = nodes.find((n) => n.id === focusNodeId)
+    if (node) {
+      const x = node.position.x + (node.measured?.width ?? 160) / 2
+      const y = node.position.y + (node.measured?.height ?? 80) / 2
+      setCenter(x, y, { zoom: 1.2, duration: 400 })
+    }
+    useDiagramStore.setState({ focusNodeId: null })
+  }, [focusNodeId, nodes, setCenter])
 
   // Fit viewport after toggling between image/module view
   const prevShowImages = useRef(showProductImages)

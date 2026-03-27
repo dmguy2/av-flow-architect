@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Click-to-navigate in Signal Chain Panel** — Clicking a validation issue zooms and centers the affected node on the canvas. Clicking device names in chain paths also navigates to that device. Essential for finding flagged issues in larger diagrams without manually scrolling. Uses a store-level `focusNode` action that triggers React Flow's `setCenter` with smooth animation.
 - **Port details in cable properties** — The Properties Panel route info for selected cables now shows source/destination port names and connector types alongside device names. E.g., "From: FOH Console → Out Main L (XLR)" instead of just "From: FOH Console". Essential for identifying specific connections on equipment with many ports. Polish of existing edge properties UI.
 - **Category filter pills in component library** — Quick filter pills (All, Audio, Video, Lighting, Infrastructure, Corporate, Software) at the top of the library panel. Click to filter to a category, click again to clear. Works alongside text search. Much faster than scrolling through all groups when you know what type of equipment you need. Inspired by Q-SYS Designer component filtering.
 - **Rename Cable from context menu** — Right-clicking an edge now shows "Rename Cable" which triggers inline label editing. Previously the only way to rename was double-clicking the thin edge path (fiddly). Uses a store-level `editingEdgeId` so the context menu can cleanly trigger AVEdge's edit mode. Deepens both the context menu and edge editing features.

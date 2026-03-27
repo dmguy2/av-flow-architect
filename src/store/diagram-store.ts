@@ -63,6 +63,8 @@ interface DiagramState {
   addNode: (node: Node<AVNodeData>) => void
   deleteSelected: () => void
   setSelectedNode: (id: string | null) => void
+  focusNodeId: string | null
+  focusNode: (id: string) => void
   updateNodeData: (nodeId: string, data: Partial<AVNodeData>) => void
   setMode: (mode: DiagramMode) => void
   setProjectName: (name: string) => void
@@ -155,6 +157,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   editingEdgeId: null,
+  focusNodeId: null,
 
   past: [],
   future: [],
@@ -323,6 +326,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
+  focusNode: (id) => set({ focusNodeId: id, selectedNodeId: id, selectedEdgeId: null }),
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
   setEditingEdge: (id) => set({ editingEdgeId: id }),
 
