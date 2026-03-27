@@ -471,6 +471,10 @@ export default function AVCanvas() {
           >
             {contextMenu.type === 'node' && (
               <>
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground truncate max-w-[180px]">
+                  {nodes.find((n) => n.id === contextMenu.nodeId)?.data.label ?? 'Node'}
+                </div>
+                <div className="-mx-1 my-0.5 h-px bg-muted" />
                 <CtxItem icon={<Copy className="w-4 h-4" />} label="Copy" shortcut={`${modKey}C`} onClick={() => { copySelected(); closeMenu() }} />
                 <CtxItem icon={<CopyPlus className="w-4 h-4" />} label="Duplicate" shortcut={`${modKey}D`} onClick={() => { duplicateSelected(); closeMenu() }} />
                 {selectedNodeCount > 1 && (
@@ -494,6 +498,10 @@ export default function AVCanvas() {
             )}
             {contextMenu.type === 'edge' && (
               <>
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground truncate max-w-[180px]">
+                  {edges.find((e) => e.id === contextMenu.edgeId)?.data?.label ?? 'Cable'}
+                </div>
+                <div className="-mx-1 my-0.5 h-px bg-muted" />
                 <CtxItem icon={<Tag className="w-4 h-4" />} label="Rename Cable" onClick={() => { setEditingEdge(contextMenu.edgeId); closeMenu() }} />
                 <div className="-mx-1 my-1 h-px bg-muted" />
                 <CtxItem icon={<Trash2 className="w-4 h-4 text-destructive" />} label="Delete Cable" shortcut="⌫" className="text-destructive focus:text-destructive" onClick={() => { deleteSelected(); closeMenu() }} />

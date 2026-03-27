@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Context menu headers** — Node and edge context menus now show the device/cable label as a header (e.g., "FOH Console", "C-03") so you can verify you're acting on the correct element before choosing an action. Prevents misclicks in dense diagrams. Standard pattern from Figma/draw.io context menus.
 - **Amplifier-to-powered-speaker validation rule** — New chain-level rule flags when a powered speaker is downstream of an external amplifier. Powered speakers have built-in amps — routing speaker-level output to them can damage the internal amplifier. Suggests connecting to line-level outputs instead. A common mistake when designers confuse powered/passive speakers. Inspired by real-world AV troubleshooting.
 - **Signal domain legend on canvas** — A compact color legend appears at the bottom-left of the canvas showing which signal domains are in use (e.g., 🔵 Audio 🟢 Video 🟡 Network). Only visible when edges exist, hidden in image view. Semi-transparent with backdrop blur. Makes screenshots and shared screens self-explanatory. Inspired by professional schematic drawing conventions.
 - **Ctrl+F node search** — Press Ctrl+F (or Cmd+F) to open a search overlay that finds devices by name, type, manufacturer, or model. Click a result or press Enter to zoom directly to it. Capped at 8 results, searches as you type. Essential for navigating large diagrams. Also added to keyboard shortcuts help dialog. Inspired by Figma's Ctrl+F search.
