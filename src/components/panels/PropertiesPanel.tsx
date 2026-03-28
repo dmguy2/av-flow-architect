@@ -16,7 +16,7 @@ import { ALL_CONFERENCE_ROLES, CONFERENCE_ROLE_LABELS, CONFERENCE_ROLE_COLORS } 
 import { GROUP_COLORS } from '@/components/canvas/GroupNode'
 
 export default function PropertiesPanel() {
-  const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
+  const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected, pushHistory } = useDiagramStore()
   const ungroupNodes = useDiagramStore((s) => s.ungroupNodes)
   const preparedBy = useDiagramStore((s) => s.preparedBy)
   const setPreparedBy = useDiagramStore((s) => s.setPreparedBy)
@@ -59,7 +59,8 @@ export default function PropertiesPanel() {
               <Label className="text-xs">Cable Label</Label>
               <Input
                 value={edgeData?.label ?? ''}
-                onChange={(e) => updateEdgeData(selectedEdge.id, { label: e.target.value || undefined })}
+                onChange={(e) => updateEdgeData(selectedEdge.id, { label: e.target.value || undefined }, { silent: true })}
+                onFocus={pushHistory}
                 placeholder="e.g. C-01, Snake 1"
                 className="h-7 text-xs"
               />
@@ -341,7 +342,8 @@ export default function PropertiesPanel() {
               <Label className="text-xs">Label</Label>
               <Input
                 value={groupData.label}
-                onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value } as never)}
+                onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value } as never, { silent: true })}
+                onFocus={pushHistory}
                 className="h-7 text-xs"
               />
             </div>
@@ -469,7 +471,8 @@ export default function PropertiesPanel() {
             <Label className="text-xs">Label</Label>
             <Input
               value={data.label}
-              onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
+              onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value }, { silent: true })}
+              onFocus={pushHistory}
               className="h-7 text-xs"
             />
           </div>
@@ -490,7 +493,8 @@ export default function PropertiesPanel() {
             {isGeneric ? (
               <Input
                 value={data.model ?? ''}
-                onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value })}
+                onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value }, { silent: true })}
+                onFocus={pushHistory}
                 placeholder="e.g. Yamaha CL5"
                 className="h-7 text-xs"
               />
@@ -519,7 +523,8 @@ export default function PropertiesPanel() {
             <Label className="text-xs">Notes</Label>
             <textarea
               value={data.notes ?? ''}
-              onChange={(e) => updateNodeData(selectedNode.id, { notes: e.target.value })}
+              onChange={(e) => updateNodeData(selectedNode.id, { notes: e.target.value }, { silent: true })}
+              onFocus={pushHistory}
               placeholder="Additional notes..."
               className="flex w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
               rows={2}

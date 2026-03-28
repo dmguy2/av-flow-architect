@@ -68,7 +68,7 @@ interface DiagramState {
   setSelectedNode: (id: string | null) => void
   focusNodeId: string | null
   focusNode: (id: string) => void
-  updateNodeData: (nodeId: string, data: Partial<AVNodeData>) => void
+  updateNodeData: (nodeId: string, data: Partial<AVNodeData>, options?: { silent?: boolean }) => void
   setMode: (mode: DiagramMode) => void
   setProjectName: (name: string) => void
   setPreparedBy: (name: string) => void
@@ -92,7 +92,7 @@ interface DiagramState {
   ungroupNodes: (groupId: string) => void
 
   // Edge data
-  updateEdgeData: (edgeId: string, data: Partial<AVEdgeData>) => void
+  updateEdgeData: (edgeId: string, data: Partial<AVEdgeData>, options?: { silent?: boolean }) => void
   selectedEdgeId: string | null
   setSelectedEdge: (id: string | null) => void
   editingEdgeId: string | null
@@ -339,11 +339,13 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
   setEditingEdge: (id) => set({ editingEdgeId: id }),
 
-  updateNodeData: (nodeId, data) => {
-    const { pushHistory, nodes } = get()
-    pushHistory()
-    const node = nodes.find((n) => n.id === nodeId)
-    log('STORE', `Updated node data: "${node?.data.label ?? nodeId}"`, Object.keys(data).join(', '))
+  updateNodeData: (nodeId, data, options?) => {
+    if (!options?.silent) {
+      const { pushHistory } = get()
+      pushHistory()
+    }
+    const node = get().nodes.find((n) => n.id === nodeId)
+    log('STORE', `Updated node data: "${node?.data.label ?? nodeId}"`, Object.keys(data).join(', '), 'debug')
     set((state) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
@@ -736,9 +738,11 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }))
   },
 
-  updateEdgeData: (edgeId, data) => {
-    const { pushHistory } = get()
-    pushHistory()
+  updateEdgeData: (edgeId, data, options?) => {
+    if (!options?.silent) {
+      const { pushHistory } = get()
+      pushHistory()
+    }
     set((state) => ({
       edges: state.edges.map((e) =>
         e.id === edgeId ? { ...e, data: { ...e.data, ...data } as AVEdgeData } : e
