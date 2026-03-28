@@ -322,13 +322,30 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
         }
       }
       // Otherwise delete selected nodes + their connected edges
+      // Reparent children of deleted groups to avoid orphaned parentId references
+      const deletedIds = new Set(state.nodes.filter((n) => n.selected).map((n) => n.id))
+      const deletedGroups = state.nodes.filter((n) => n.selected && n.type === 'group')
+      const groupPositions = new Map(deletedGroups.map((g) => [g.id, g.position]))
+
       return {
-        nodes: state.nodes.filter((n) => !n.selected),
+        nodes: state.nodes
+          .filter((n) => !n.selected)
+          .map((n) => {
+            if (n.parentId && groupPositions.has(n.parentId)) {
+              const gp = groupPositions.get(n.parentId)!
+              return {
+                ...n,
+                parentId: undefined,
+                position: { x: n.position.x + gp.x, y: n.position.y + gp.y },
+                expandParent: undefined,
+              }
+            }
+            return n
+          }),
         edges: state.edges.filter(
-          (e) =>
-            !state.nodes.some((n) => n.selected && (e.source === n.id || e.target === n.id))
+          (e) => !deletedIds.has(e.source) && !deletedIds.has(e.target)
         ),
-        selectedNodeId: state.nodes.find((n) => n.selected)?.id === selectedNodeId ? null : selectedNodeId,
+        selectedNodeId: deletedIds.has(selectedNodeId ?? '') ? null : selectedNodeId,
         isDirty: true,
       }
     })
