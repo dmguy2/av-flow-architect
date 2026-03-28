@@ -129,6 +129,25 @@ function AVEdge({
           transition: 'stroke-width 0.1s ease',
         }}
       />
+      {/* Signal flow direction arrow at target end */}
+      {(() => {
+        const dx = targetX - sourceX
+        const dy = targetY - sourceY
+        if (dx * dx + dy * dy < 2500) return null // skip if edge < 50px
+        const tp = targetPosition as string
+        const offX = tp === 'left' ? -10 : tp === 'right' ? 10 : 0
+        const offY = tp === 'top' ? -10 : tp === 'bottom' ? 10 : 0
+        const rot = tp === 'left' ? 0 : tp === 'right' ? 180 : tp === 'top' ? 90 : 270
+        return (
+          <polygon
+            points="-4,-3 5,0 -4,3"
+            fill={color}
+            fillOpacity={selected ? 1 : hovered ? 0.7 : 0.45}
+            transform={`translate(${targetX + offX},${targetY + offY}) rotate(${rot})`}
+            style={{ transition: 'fill-opacity 0.15s ease' }}
+          />
+        )
+      })()}
       {/* Persistent warning pill (always visible, not just on hover) */}
       {data?.warning && !showProductImages && (
         <foreignObject
