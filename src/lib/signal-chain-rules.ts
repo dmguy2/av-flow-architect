@@ -12,7 +12,7 @@ import type { SignalChain } from './signal-chain'
 
 export interface ChainIssue {
   severity: 'error' | 'warning' | 'info'
-  category: 'gain-staging' | 'impedance' | 'power' | 'missing-device' | 'signal-type' | 'disconnected'
+  category: 'gain-staging' | 'impedance' | 'power' | 'missing-device' | 'signal-type' | 'disconnected' | 'labeling'
   message: string
   suggestion: string
   chainId: string
@@ -354,6 +354,40 @@ function checkFeedbackLoops(
 }
 
 /**
+ * Detect duplicate cable IDs — two or more cables sharing the same label.
+ * Duplicate IDs make cable schedules ambiguous, causing confusion on job sites
+ * when installers can't tell which cable is which.
+ */
+function checkDuplicateCableIds(
+  edges: Edge<AVEdgeData>[]
+): ChainIssue[] {
+  const labelMap = new Map<string, Edge<AVEdgeData>[]>()
+  for (const edge of edges) {
+    const label = edge.data?.label?.trim()
+    if (!label) continue
+    const existing = labelMap.get(label)
+    if (existing) existing.push(edge)
+    else labelMap.set(label, [edge])
+  }
+
+  const issues: ChainIssue[] = []
+  for (const [label, dupes] of labelMap) {
+    if (dupes.length < 2) continue
+    const affectedNodes = [...new Set(dupes.flatMap((e) => [e.source, e.target].filter(Boolean)))]
+    issues.push({
+      severity: 'warning',
+      category: 'labeling',
+      message: `Duplicate cable ID "${label}" used on ${dupes.length} cables`,
+      suggestion: 'Rename cables so each has a unique ID for clear cable schedules',
+      chainId: '',
+      affectedNodes,
+    })
+  }
+
+  return issues
+}
+
+/**
  * Graph-level analysis that checks all nodes/edges for structural issues
  * (disconnected devices, feedback loops, etc.) that chain-level analysis can't detect.
  */
@@ -365,5 +399,6 @@ export function analyzeGraphIssues(
     ...checkDisconnectedSinks(nodes, edges),
     ...checkDisconnectedSources(nodes, edges),
     ...checkFeedbackLoops(nodes, edges),
+    ...checkDuplicateCableIds(edges),
   ]
 }
