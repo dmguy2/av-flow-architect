@@ -47,6 +47,8 @@ const SHORTCUT_GROUPS = [
   {
     label: 'Canvas',
     shortcuts: [
+      { keys: `${MOD}1`, action: 'Zoom to fit' },
+      { keys: 'L', action: 'Toggle edge labels' },
       { keys: 'Right-click', action: 'Context menu' },
       { keys: 'Scroll', action: 'Zoom in/out' },
       { keys: 'Click + drag', action: 'Pan canvas' },
@@ -83,6 +85,9 @@ export default function Toolbar() {
     viewMode,
     setViewMode,
   } = useDiagramStore()
+
+  const showEdgeLabels = useDiagramStore((s) => s.showEdgeLabels)
+  const setShowEdgeLabels = useDiagramStore((s) => s.setShowEdgeLabels)
 
   const selectedCount = nodes.filter((n) => n.selected && n.type !== 'group').length
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -168,6 +173,16 @@ export default function Toolbar() {
         setSearchQuery('')
         setTimeout(() => searchInputRef.current?.focus(), 50)
       }
+      // Ctrl+1: Zoom to fit (dispatches event caught by AVCanvas)
+      if ((e.metaKey || e.ctrlKey) && e.key === '1') {
+        e.preventDefault()
+        window.dispatchEvent(new Event('av-fit-view'))
+      }
+      // L: Toggle edge labels (single key, only outside text inputs)
+      if (e.key === 'l' && !e.metaKey && !e.ctrlKey && !e.altKey &&
+          !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        setShowEdgeLabels(!showEdgeLabels)
+      }
       if (e.key === 'Escape') {
         if (showSearch) {
           setShowSearch(false)
@@ -181,7 +196,7 @@ export default function Toolbar() {
         }
       }
     },
-    [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll, showSearch]
+    [undo, redo, saveProject, groupSelectedNodes, duplicateSelected, copySelected, pasteClipboard, selectAll, showSearch, showEdgeLabels, setShowEdgeLabels]
   )
 
   useEffect(() => {

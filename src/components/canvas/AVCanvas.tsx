@@ -183,6 +183,13 @@ export default function AVCanvas() {
     useDiagramStore.setState({ focusNodeId: null })
   }, [focusNodeId, nodes, setCenter])
 
+  // Zoom to fit when triggered by keyboard shortcut (Ctrl+1)
+  useEffect(() => {
+    const handler = () => fitView({ padding: 0.15, duration: 300 })
+    window.addEventListener('av-fit-view', handler)
+    return () => window.removeEventListener('av-fit-view', handler)
+  }, [fitView])
+
   // Fit viewport after toggling between image/module view
   const prevShowImages = useRef(showProductImages)
   useEffect(() => {
