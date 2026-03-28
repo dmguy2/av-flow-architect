@@ -27,6 +27,8 @@ export default function TemplatePickerDialog({ open, onOpenChange }: Props) {
       template.edges.map((e) => ({ ...e }))
     )
     onOpenChange(false)
+    // Zoom to fit the new template content after a brief render delay
+    setTimeout(() => window.dispatchEvent(new Event('av-fit-view')), 100)
   }
 
   return (

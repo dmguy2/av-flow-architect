@@ -39,6 +39,7 @@ export default function ProjectManager() {
     await saveProject() // save current work before switching
     await loadProject(id)
     setOpen(false)
+    setTimeout(() => window.dispatchEvent(new Event('av-fit-view')), 100)
   }
 
   const handleDelete = async (id: string) => {

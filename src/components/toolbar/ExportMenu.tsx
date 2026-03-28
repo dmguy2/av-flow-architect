@@ -25,6 +25,7 @@ export default function ExportMenu() {
     if (!file) return
     try {
       await importProjectFile(file)
+      setTimeout(() => window.dispatchEvent(new Event('av-fit-view')), 100)
     } catch {
       alert('Failed to import file. Make sure it is a valid .avd file.')
     }
