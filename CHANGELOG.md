@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-27
+- **Smart alignment snap guides (helper lines)** — Dragging a node now shows blue dashed guide lines when the node's edges or center align with other nodes. The node snaps to the alignment position for precise placement. Works alongside the existing 16px grid snap — the alignment guides override the grid when within range of another node's edge/center. Only activates for single-node drag (not multi-select). Computes alignment against left/center/right (X) and top/center/bottom (Y) of every non-selected node. Inspired by Figma/draw.io alignment guides.
 - **Fix: Search overlay click-outside dismissal** — The Ctrl+F search overlay now closes when clicking anywhere outside it (canvas, panels, etc.). Previously it only closed via Escape or the X button, which meant it could obscure the diagram indefinitely. Added an invisible backdrop matching the context menu pattern.
 - **Fix: System summary validation status reactivity** — Fixed bug where the Properties Panel system summary used `getState()` for chain issues instead of a proper Zustand selector, causing validation status to not update when auto-analysis ran. Now subscribes reactively so error/warning counts update immediately.
 - **Escape to deselect** — Pressing Escape now deselects all nodes and edges (when not in a text input or search overlay). The most fundamental interaction pattern in diagramming tools — closes the gap with Figma/draw.io conventions. Added to keyboard shortcuts help dialog.

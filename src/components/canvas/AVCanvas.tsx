@@ -8,6 +8,7 @@ import {
   BackgroundVariant,
   ConnectionMode,
   useReactFlow,
+  useViewport,
   type NodeTypes,
   type EdgeTypes,
   type OnSelectionChangeFunc,
@@ -27,6 +28,7 @@ import { validateConnection } from '@/lib/connection-validation'
 import type { AVNodeData, AVEdgeData, AVPort } from '@/types/av'
 import type { Node, Edge, IsValidConnection, NodeChange, EdgeChange } from '@xyflow/react'
 import { log } from '@/lib/logger'
+import { getHelperLines } from '@/lib/helper-lines'
 import { Copy, Trash2, CopyPlus, Group, ClipboardPaste, MousePointerSquareDashed, Maximize, AlertTriangle, AlignCenterHorizontal, AlignCenterVertical, AlignHorizontalSpaceAround, AlignVerticalSpaceAround, Tag } from 'lucide-react'
 
 // ── Error boundary for node rendering resilience ──
@@ -88,6 +90,31 @@ type ContextMenu =
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
 const modKey = isMac ? '⌘' : 'Ctrl+'
 
+// ── Alignment snap guide lines (rendered inside ReactFlow) ──
+
+function HelperLines({ horizontal, vertical }: { horizontal: number | null; vertical: number | null }) {
+  const { x: panX, y: panY, zoom } = useViewport()
+  if (horizontal == null && vertical == null) return null
+  return (
+    <svg style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0, pointerEvents: 'none', zIndex: 4 }}>
+      {vertical != null && (
+        <line
+          x1={vertical * zoom + panX} y1={0}
+          x2={vertical * zoom + panX} y2="100%"
+          stroke="#0ea5e9" strokeWidth={1} strokeDasharray="4 2" opacity={0.7}
+        />
+      )}
+      {horizontal != null && (
+        <line
+          x1={0} y1={horizontal * zoom + panY}
+          x2="100%" y2={horizontal * zoom + panY}
+          stroke="#0ea5e9" strokeWidth={1} strokeDasharray="4 2" opacity={0.7}
+        />
+      )}
+    </svg>
+  )
+}
+
 export default function AVCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { fitView, setCenter } = useReactFlow()
@@ -115,6 +142,9 @@ export default function AVCanvas() {
   const clipboard = useDiagramStore((s) => s.clipboard)
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null)
+  const [helperLines, setHelperLines] = useState<{ horizontal: number | null; vertical: number | null }>({ horizontal: null, vertical: null })
+  const nodesRef = useRef(nodes)
+  nodesRef.current = nodes
   const focusNodeId = useDiagramStore((s) => s.focusNodeId)
 
   // Zoom to node when focusNodeId is set (e.g., clicking issue in Signal Chain Panel)
@@ -140,10 +170,61 @@ export default function AVCanvas() {
     }
   }, [showProductImages, fitView])
 
-  // Wrap onNodesChange to detect selection changes
+  // Wrap onNodesChange to detect selection + compute alignment snap guides
   const handleNodesChange = useCallback(
     (changes: NodeChange<Node<AVNodeData>>[]) => {
-      onNodesChange(changes)
+      let modifiedChanges = changes
+      let newHLine: number | null = null
+      let newVLine: number | null = null
+
+      // Detect single-node drag for alignment snap
+      let dragId: string | null = null
+      let dragPos: { x: number; y: number } | null = null
+      let multiDrag = false
+      for (const c of changes) {
+        if (c.type === 'position' && c.dragging && c.position) {
+          if (dragId) { multiDrag = true; break }
+          dragId = c.id
+          dragPos = c.position
+        }
+      }
+
+      if (dragId && dragPos && !multiDrag) {
+        const currentNodes = nodesRef.current
+        const dragNode = currentNodes.find((n) => n.id === dragId)
+        if (dragNode) {
+          const others = currentNodes.filter(
+            (n) => n.id !== dragId && !n.selected && n.type !== 'group'
+          )
+          const result = getHelperLines(
+            { id: dragId, x: dragPos.x, y: dragPos.y, width: dragNode.measured?.width ?? 160, height: dragNode.measured?.height ?? 80 },
+            others.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.measured?.width ?? 160, height: n.measured?.height ?? 80 }))
+          )
+          newHLine = result.horizontalLine
+          newVLine = result.verticalLine
+          if (result.snapX != null || result.snapY != null) {
+            const sx = result.snapX ?? dragPos.x
+            const sy = result.snapY ?? dragPos.y
+            modifiedChanges = changes.map((c) =>
+              c.type === 'position' && c.id === dragId ? { ...c, position: { x: sx, y: sy } } : c
+            )
+          }
+        }
+      }
+
+      // Clear on drag end
+      if (changes.some((c) => c.type === 'position' && c.dragging === false)) {
+        newHLine = null
+        newVLine = null
+      }
+
+      setHelperLines((prev) =>
+        prev.horizontal === newHLine && prev.vertical === newVLine ? prev : { horizontal: newHLine, vertical: newVLine }
+      )
+
+      onNodesChange(modifiedChanges)
+
+      // Handle selection changes
       const selectionChange = changes.find(
         (c) => c.type === 'select'
       ) as (NodeChange & { type: 'select'; id: string; selected: boolean }) | undefined
@@ -151,7 +232,6 @@ export default function AVCanvas() {
         if (selectionChange.selected) {
           setSelectedNode(selectionChange.id)
         } else {
-          // Only clear if no other node is selected
           const otherSelected = changes.find(
             (c) => c.type === 'select' && 'selected' in c && c.selected && c.id !== selectionChange.id
           )
@@ -433,6 +513,7 @@ export default function AVCanvas() {
         deleteKeyCode="Delete"
         className="bg-background"
       >
+        <HelperLines horizontal={helperLines.horizontal} vertical={helperLines.vertical} />
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
         <Controls
           className="av-controls"
