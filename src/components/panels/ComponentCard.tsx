@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useCallback } from 'react'
-import { Trash2, Pencil } from 'lucide-react'
+import { Trash2, Pencil, Star } from 'lucide-react'
 import type { AVComponentDef } from '@/types/av'
 import { getIcon } from '@/lib/icons'
 import { SIGNAL_COLORS } from '@/lib/signal-colors'
@@ -21,10 +21,12 @@ interface ComponentCardProps {
   def: AVComponentDef
   showImage?: boolean
   deletable?: boolean
+  isFavorite?: boolean
+  onToggleFavorite?: (type: string) => void
   onEdit?: (def: AVComponentDef) => void
 }
 
-function ComponentCard({ def, showImage, deletable, onEdit }: ComponentCardProps) {
+function ComponentCard({ def, showImage, deletable, isFavorite, onToggleFavorite, onEdit }: ComponentCardProps) {
   const Icon = getIcon(def.icon)
   const catColor = CATEGORY_COLORS[def.category]
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -135,6 +137,21 @@ function ComponentCard({ def, showImage, deletable, onEdit }: ComponentCardProps
           </div>
         </div>
       </div>
+      {/* Favorite star */}
+      {onToggleFavorite && (
+        <button
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleFavorite(def.type) }}
+          className={cn(
+            'absolute right-1 top-1 p-0.5 rounded transition-all',
+            isFavorite
+              ? 'text-amber-400 opacity-100'
+              : 'text-muted-foreground/40 opacity-0 group-hover:opacity-100 hover:text-amber-400'
+          )}
+          title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Star className="w-3 h-3" fill={isFavorite ? 'currentColor' : 'none'} />
+        </button>
+      )}
       {deletable && (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
           {onEdit && (

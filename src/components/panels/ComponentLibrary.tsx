@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, Boxes, Layers, FileStack, Download, Package, Library, Loader2, Check, X, Ban, Clock } from 'lucide-react'
+import { Search, Boxes, Layers, FileStack, Download, Package, Library, Loader2, Check, X, Ban, Clock, Star } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -272,6 +272,32 @@ export default function ComponentLibrary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refresh])
 
+  // Favorite components (persisted in localStorage)
+  const favoritesKey = 'av-favorite-components'
+  const favoriteTypes = useMemo(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem(favoritesKey) || '[]'))
+    } catch { return new Set<string>() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh])
+
+  const favoriteDefs = useMemo(() => {
+    return [...favoriteTypes]
+      .map((t) => componentDefinitions.find((c) => c.type === t))
+      .filter((d): d is AVComponentDef => d !== undefined)
+  }, [favoriteTypes])
+
+  const toggleFavorite = useCallback((type: string) => {
+    try {
+      const current: string[] = JSON.parse(localStorage.getItem(favoritesKey) || '[]')
+      const idx = current.indexOf(type)
+      if (idx >= 0) current.splice(idx, 1)
+      else current.push(type)
+      localStorage.setItem(favoritesKey, JSON.stringify(current))
+      setRefresh((n) => n + 1)
+    } catch { /* ignore */ }
+  }, [])
+
   // Listen for drops on the canvas to refresh recent list
   useEffect(() => {
     const handler = () => setRefresh((n) => n + 1)
@@ -537,8 +563,22 @@ export default function ComponentLibrary() {
             {/* Library view: grouped by category */}
             {componentView === 'library' && (
               <div className="p-2 space-y-3">
+                {/* Favorite components */}
+                {!search && !categoryFilter && favoriteDefs.length > 0 && (
+                  <div>
+                    <h3 className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1.5">
+                      <Star className="w-3 h-3" />
+                      Favorites
+                    </h3>
+                    <div className="space-y-1">
+                      {favoriteDefs.map((def) => (
+                        <ComponentCard key={`fav-${def.type}`} def={def} isFavorite onToggleFavorite={toggleFavorite} />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Recently used components */}
-                {!search && recentDefs.length > 0 && (
+                {!search && !categoryFilter && recentDefs.length > 0 && (
                   <div>
                     <h3 className="flex items-center gap-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-1.5">
                       <Clock className="w-3 h-3" />
@@ -546,7 +586,7 @@ export default function ComponentLibrary() {
                     </h3>
                     <div className="space-y-1">
                       {recentDefs.map((def) => (
-                        <ComponentCard key={`recent-${def.type}`} def={def} />
+                        <ComponentCard key={`recent-${def.type}`} def={def} isFavorite={favoriteTypes.has(def.type)} onToggleFavorite={toggleFavorite} />
                       ))}
                     </div>
                   </div>
@@ -564,7 +604,7 @@ export default function ComponentLibrary() {
                       </h3>
                       <div className="space-y-1">
                         {items.map((def) => (
-                          <ComponentCard key={def.type} def={def} />
+                          <ComponentCard key={def.type} def={def} isFavorite={favoriteTypes.has(def.type)} onToggleFavorite={toggleFavorite} />
                         ))}
                       </div>
                     </div>
