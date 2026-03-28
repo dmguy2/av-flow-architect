@@ -96,6 +96,13 @@ function App() {
     startup()
   }, [loadProject])
 
+  // Open template picker when a new project is created from the Project Manager
+  useEffect(() => {
+    const handler = () => setShowTemplatePicker(true)
+    window.addEventListener('av-new-project', handler)
+    return () => window.removeEventListener('av-new-project', handler)
+  }, [])
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
       <Toolbar />

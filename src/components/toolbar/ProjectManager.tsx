@@ -31,6 +31,8 @@ export default function ProjectManager() {
     newProject(newName || undefined)
     setNewName('')
     setOpen(false)
+    // Show template picker for the new project
+    window.dispatchEvent(new Event('av-new-project'))
   }
 
   const handleLoad = async (id: string) => {
