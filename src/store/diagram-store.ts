@@ -645,17 +645,28 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       }
     })
 
+    // Find next available cable number to avoid duplicate IDs
+    let maxCableNum = 0
+    for (const e of edges) {
+      const m = e.data?.label?.match(/^C-(\d+)$/)
+      if (m) maxCableNum = Math.max(maxCableNum, parseInt(m[1], 10))
+    }
+
     // Duplicate internal edges (both source and target in selection)
     const selectedIds = new Set(selected.map((n) => n.id))
     const newEdges = edges
       .filter((e) => selectedIds.has(e.source) && selectedIds.has(e.target))
-      .map((e) => ({
-        ...e,
-        id: generateId(),
-        source: idMap.get(e.source) ?? e.source,
-        target: idMap.get(e.target) ?? e.target,
-        data: e.data ? { ...e.data } : undefined,
-      }))
+      .map((e) => {
+        maxCableNum++
+        const newLabel = `C-${String(maxCableNum).padStart(2, '0')}`
+        return {
+          ...e,
+          id: generateId(),
+          source: idMap.get(e.source) ?? e.source,
+          target: idMap.get(e.target) ?? e.target,
+          data: e.data ? { ...e.data, label: newLabel } : undefined,
+        }
+      })
 
     set((state) => ({
       nodes: [
@@ -770,7 +781,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
   },
 
   pasteClipboard: () => {
-    const { clipboard, pushHistory } = get()
+    const { clipboard, pushHistory, edges } = get()
     if (!clipboard || clipboard.nodes.length === 0) return
 
     pushHistory()
@@ -791,13 +802,24 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       }
     })
 
-    const newEdges = clipboard.edges.map((e) => ({
-      ...e,
-      id: generateId(),
-      source: idMap.get(e.source) ?? e.source,
-      target: idMap.get(e.target) ?? e.target,
-      data: e.data ? { ...e.data } : undefined,
-    }))
+    // Find next available cable number to avoid duplicate IDs
+    let maxCableNum = 0
+    for (const e of edges) {
+      const m = e.data?.label?.match(/^C-(\d+)$/)
+      if (m) maxCableNum = Math.max(maxCableNum, parseInt(m[1], 10))
+    }
+
+    const newEdges = clipboard.edges.map((e) => {
+      maxCableNum++
+      const newLabel = `C-${String(maxCableNum).padStart(2, '0')}`
+      return {
+        ...e,
+        id: generateId(),
+        source: idMap.get(e.source) ?? e.source,
+        target: idMap.get(e.target) ?? e.target,
+        data: e.data ? { ...e.data, label: newLabel } : undefined,
+      }
+    })
 
     set((state) => ({
       nodes: [
