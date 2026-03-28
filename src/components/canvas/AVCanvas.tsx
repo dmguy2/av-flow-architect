@@ -90,6 +90,30 @@ type ContextMenu =
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
 const modKey = isMac ? '⌘' : 'Ctrl+'
 
+// ── Minimap node colors by device role ──
+
+const ROLE_FILL: Record<string, string> = {
+  source: 'rgba(96, 165, 250, 0.55)',       // blue-400
+  processor: 'rgba(245, 158, 11, 0.55)',     // amber-500
+  destination: 'rgba(52, 211, 153, 0.55)',   // emerald-400
+  infrastructure: 'rgba(156, 163, 175, 0.4)', // gray-400
+}
+const ROLE_STROKE: Record<string, string> = {
+  source: 'rgba(96, 165, 250, 0.8)',
+  processor: 'rgba(245, 158, 11, 0.8)',
+  destination: 'rgba(52, 211, 153, 0.8)',
+  infrastructure: 'rgba(156, 163, 175, 0.7)',
+}
+
+function minimapNodeColor(node: Node<AVNodeData>): string {
+  if (node.type === 'group') return 'rgba(255, 255, 255, 0.04)'
+  return ROLE_FILL[node.data.deviceRole ?? ''] ?? 'rgba(255, 255, 255, 0.2)'
+}
+function minimapStrokeColor(node: Node<AVNodeData>): string {
+  if (node.type === 'group') return 'rgba(255, 255, 255, 0.08)'
+  return ROLE_STROKE[node.data.deviceRole ?? ''] ?? 'rgba(255, 255, 255, 0.3)'
+}
+
 // ── Alignment snap guide lines (rendered inside ReactFlow) ──
 
 function HelperLines({ horizontal, vertical }: { horizontal: number | null; vertical: number | null }) {
@@ -522,8 +546,8 @@ export default function AVCanvas() {
         <MiniMap
           className="av-minimap"
           nodeStrokeWidth={2}
-          nodeColor="rgba(255, 255, 255, 0.15)"
-          nodeStrokeColor="rgba(255, 255, 255, 0.25)"
+          nodeColor={minimapNodeColor}
+          nodeStrokeColor={minimapStrokeColor}
           maskColor="rgba(0, 0, 0, 0.65)"
           bgColor="transparent"
           zoomable
