@@ -26,13 +26,15 @@ export default function ProjectManager() {
     }
   }, [open, loadProjects])
 
-  const handleNew = () => {
+  const handleNew = async () => {
+    await saveProject() // save current work before switching
     newProject(newName || undefined)
     setNewName('')
     setOpen(false)
   }
 
   const handleLoad = async (id: string) => {
+    await saveProject() // save current work before switching
     await loadProject(id)
     setOpen(false)
   }
