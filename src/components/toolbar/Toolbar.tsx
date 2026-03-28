@@ -235,12 +235,20 @@ export default function Toolbar() {
 
   return (
     <div className="relative h-11 border-b border-border bg-card flex items-center px-3 gap-1.5 shrink-0">
-      {/* Project name */}
-      <Input
-        value={projectName}
-        onChange={(e) => setProjectName(e.target.value)}
-        className="w-44 h-7 text-sm font-medium border-transparent hover:border-input focus:border-input bg-transparent"
-      />
+      {/* Project name + save indicator */}
+      <div className="relative">
+        <Input
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          className="w-44 h-7 text-sm font-medium border-transparent hover:border-input focus:border-input bg-transparent"
+        />
+        {isDirty && (
+          <div
+            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse"
+            title="Unsaved changes — auto-saving..."
+          />
+        )}
+      </div>
 
       <Separator orientation="vertical" className="h-5 mx-1" />
 
