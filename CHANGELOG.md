@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-03-28
+- **"Prepared By" field for professional PDF exports** — Added a "Prepared By" input in the System Summary panel (shown when nothing is selected). The value persists with the project via auto-save and appears in the title block of every page in the Print PDF export (diagram, cable schedule, equipment list). Every professional AV engineering drawing has "Prepared by" in the title block — this was already supported by the export code but the UI never exposed it. Now it flows end-to-end: enter your name once, it saves with the project, and every exported PDF page shows it. Inspired by AVIXA drawing standards and Crestron D3 Pro title blocks.
 - **Connector compatibility matrix fix + expansion** — Fixed BNC↔SDI incorrectly blocking connections (SDI runs over BNC connectors — changed from 'incompatible' to 'passive-adapter' with signal format verification note). Added 10 new pairings: DMX↔XLR/TRS/Speakon (incompatible — catches the common mistake of wiring lighting DMX to audio), Ethernet↔Fiber (active converter), Fiber↔Thunderbolt, BNC↔DisplayPort, and digital audio protocol mismatches AES50↔Dante, AES50↔NDI, Dante↔NDI (all incompatible — different protocols on same cable). Matrix expanded from 14 to 24 entries covering the most common cross-domain wiring mistakes in AV/broadcast. Inspired by real-world AV troubleshooting and AVIXA wiring standards.
 
 ## 2026-03-27

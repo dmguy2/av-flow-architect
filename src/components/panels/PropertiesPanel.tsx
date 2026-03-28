@@ -18,6 +18,8 @@ import { GROUP_COLORS } from '@/components/canvas/GroupNode'
 export default function PropertiesPanel() {
   const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
   const ungroupNodes = useDiagramStore((s) => s.ungroupNodes)
+  const preparedBy = useDiagramStore((s) => s.preparedBy)
+  const setPreparedBy = useDiagramStore((s) => s.setPreparedBy)
   const viewMode = useDiagramStore((s) => s.viewMode)
   const model3dStatus = useDiagramStore((s) => s.model3dStatus)
   const chainIssuesFromStore = useDiagramStore((s) => s.chainIssues)
@@ -297,6 +299,18 @@ export default function PropertiesPanel() {
                 No issues detected
               </div>
             )}
+
+            {/* Prepared By — shows in PDF title block */}
+            <Separator />
+            <div className="space-y-1">
+              <Label className="text-xs">Prepared By</Label>
+              <Input
+                value={preparedBy}
+                onChange={(e) => setPreparedBy(e.target.value)}
+                placeholder="Designer name (for PDF export)"
+                className="h-7 text-xs"
+              />
+            </div>
           </div>
         </ScrollArea>
       </div>

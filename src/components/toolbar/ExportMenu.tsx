@@ -13,6 +13,7 @@ import { exportPng, exportSvg, exportPdf, exportPrintPdf, exportCableScheduleCsv
 
 export default function ExportMenu() {
   const projectName = useDiagramStore((s) => s.projectName)
+  const preparedBy = useDiagramStore((s) => s.preparedBy)
   const nodes = useDiagramStore((s) => s.nodes)
   const edges = useDiagramStore((s) => s.edges)
   const exportProjectFile = useDiagramStore((s) => s.exportProjectFile)
@@ -60,7 +61,7 @@ export default function ExportMenu() {
             <FileText className="w-4 h-4" />
             Export as PDF
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => exportPrintPdf({ projectName, nodes, edges })}>
+          <DropdownMenuItem onClick={() => exportPrintPdf({ projectName, nodes, edges, preparedBy: preparedBy || undefined })}>
             <Printer className="w-4 h-4" />
             Print PDF (with cable schedule)
           </DropdownMenuItem>

@@ -32,6 +32,7 @@ interface DiagramState {
   // Project
   projectId: string
   projectName: string
+  preparedBy: string
   mode: DiagramMode
   isDirty: boolean
 
@@ -70,6 +71,7 @@ interface DiagramState {
   updateNodeData: (nodeId: string, data: Partial<AVNodeData>) => void
   setMode: (mode: DiagramMode) => void
   setProjectName: (name: string) => void
+  setPreparedBy: (name: string) => void
   setDarkMode: (dark: boolean) => void
 
   // History
@@ -150,6 +152,7 @@ const defaultPageId = generateId()
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   projectId: generateId(),
   projectName: 'Untitled Diagram',
+  preparedBy: '',
   mode: 'signal-flow',
   isDirty: false,
 
@@ -360,6 +363,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }))
   },
   setProjectName: (name) => set({ projectName: name, isDirty: true }),
+  setPreparedBy: (name: string) => set({ preparedBy: name, isDirty: true }),
   setDarkMode: (dark) => {
     document.documentElement.classList.toggle('dark', dark)
     set({ darkMode: dark })
@@ -527,6 +531,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       pages: syncedPages,
       activePageId: state.activePageId,
       viewMode: state.viewMode,
+      preparedBy: state.preparedBy || undefined,
     }
     await db.projects.put(project)
     set({ pages: syncedPages, isDirty: false })
@@ -576,6 +581,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       showEdgeLabels: project.showEdgeLabels ?? false,
       viewMode: project.viewMode ?? 'module',
       showProductImages: (project.viewMode ?? 'module') === 'image',
+      preparedBy: project.preparedBy ?? '',
       isDirty: false,
       past: [],
       future: [],
@@ -589,6 +595,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     set({
       projectId: generateId(),
       projectName: name ?? 'Untitled Diagram',
+      preparedBy: '',
       mode: 'signal-flow',
       pages: [{ id: pageId, label: 'Page 1', nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }],
       activePageId: pageId,

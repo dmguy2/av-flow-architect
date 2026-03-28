@@ -163,4 +163,5 @@ export interface AVProject {
   activePageId?: string
   offsheetConnectors?: OffsheetConnector[]
   viewMode?: ViewMode
+  preparedBy?: string
 }
