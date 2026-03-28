@@ -99,7 +99,10 @@ export default function ProjectManager() {
                 <div className="text-sm font-medium">{proj.name}</div>
                 <div className="text-xs text-muted-foreground">
                   {new Date(proj.updatedAt).toLocaleDateString()} &middot;{' '}
-                  {proj.nodes.length} nodes
+                  {(proj.pages && proj.pages.length > 0
+                    ? proj.pages.reduce((sum, p) => sum + p.nodes.length, 0)
+                    : proj.nodes.length)} nodes
+                  {proj.pages && proj.pages.length > 1 && ` · ${proj.pages.length} pages`}
                 </div>
               </div>
               <Button
