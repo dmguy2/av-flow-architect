@@ -546,11 +546,14 @@ function drawEquipmentList(
     pdf.setTextColor(30, 30, 30)
 
     let cx = margin + 4
+    const makeModel = node.data.manufacturer && node.data.model
+      ? `${node.data.manufacturer} ${node.data.model}`
+      : node.data.model ?? node.data.manufacturer ?? '—'
     const values = [
       `${idx + 1}`,
       node.data.label,
       node.data.componentType.replace(/-/g, ' '),
-      node.data.model ?? '—',
+      makeModel,
       node.data.notes ?? '—',
     ]
     const widths = [sCols.num, sCols.label, sCols.type, sCols.model, sCols.notes]
