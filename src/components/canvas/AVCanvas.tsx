@@ -560,7 +560,7 @@ export default function AVCanvas() {
         snapToGrid
         snapGrid={[16, 16]}
         fitView
-        deleteKeyCode="Delete"
+        deleteKeyCode={null}
         className="bg-background"
       >
         <HelperLines horizontal={helperLines.horizontal} vertical={helperLines.vertical} />
