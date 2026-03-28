@@ -73,7 +73,7 @@ export const templates: Template[] = [
     ],
     edges: [
       makeEdge('e1', 'n8', 'out-hdmi', 'n2', 'in-hdmi', 'video', 'hdmi'),
-      makeEdge('e2', 'n2', 'out-audio', 'n3', 'in-1', 'audio', 'trs'),
+      makeEdge('e2', 'n2', 'out-audio', 'n3', 'in-3', 'audio', 'trs'),
       makeEdge('e3', 'n4', 'out-1', 'n3', 'in-1', 'audio', 'xlr'),
       makeEdge('e4', 'n5', 'out-1', 'n3', 'in-2', 'audio', 'xlr'),
       makeEdge('e5', 'n3', 'out-1', 'n6', 'in-1', 'audio', 'speakon'),

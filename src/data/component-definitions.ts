@@ -96,6 +96,8 @@ const genericDefinitions: AVComponentDef[] = [
     defaultPorts: [
       { id: 'in-1', label: 'Input 1', domain: 'audio', connector: 'xlr', direction: 'input' },
       { id: 'in-2', label: 'Input 2', domain: 'audio', connector: 'xlr', direction: 'input' },
+      { id: 'in-3', label: 'Input 3', domain: 'audio', connector: 'xlr', direction: 'input' },
+      { id: 'in-4', label: 'Input 4', domain: 'audio', connector: 'xlr', direction: 'input' },
       { id: 'out-1', label: 'Output 1', domain: 'audio', connector: 'xlr', direction: 'output' },
       { id: 'out-2', label: 'Output 2', domain: 'audio', connector: 'xlr', direction: 'output' },
       { id: 'out-3', label: 'Output 3', domain: 'audio', connector: 'xlr', direction: 'output' },
