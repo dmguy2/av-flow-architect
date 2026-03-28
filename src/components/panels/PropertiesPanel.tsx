@@ -439,10 +439,10 @@ export default function PropertiesPanel() {
     })
   }
 
-  const updatePort = (portId: string, updates: Partial<AVPort>) => {
+  const updatePort = (portId: string, updates: Partial<AVPort>, options?: { silent?: boolean }) => {
     updateNodeData(selectedNode.id, {
       ports: data.ports.map((p: AVPort) => (p.id === portId ? { ...p, ...updates } : p)),
-    })
+    }, options)
   }
 
   const togglePortEnabled = (portId: string) => {
@@ -576,7 +576,8 @@ export default function PropertiesPanel() {
                         />
                         <Input
                           value={port.label}
-                          onChange={(e) => updatePort(port.id, { label: e.target.value })}
+                          onChange={(e) => updatePort(port.id, { label: e.target.value }, { silent: true })}
+                          onFocus={pushHistory}
                           className="h-6 text-[10px] flex-1"
                         />
                         <select
