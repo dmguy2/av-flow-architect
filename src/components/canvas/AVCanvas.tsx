@@ -139,6 +139,25 @@ function HelperLines({ horizontal, vertical }: { horizontal: number | null; vert
   )
 }
 
+// ── Zoom percentage indicator ──
+
+function ZoomIndicator() {
+  const { zoom } = useViewport()
+  const { zoomTo } = useReactFlow()
+  const pct = Math.round(zoom * 100)
+  return (
+    <Panel position="bottom-left" className="!mb-[52px] !ml-1.5">
+      <button
+        onClick={() => zoomTo(1, { duration: 200 })}
+        className="px-1.5 py-0.5 rounded bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm text-[10px] text-muted-foreground tabular-nums hover:text-foreground transition-colors"
+        title="Click to reset to 100%"
+      >
+        {pct}%
+      </button>
+    </Panel>
+  )
+}
+
 export default function AVCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const { fitView, setCenter } = useReactFlow()
@@ -550,6 +569,7 @@ export default function AVCanvas() {
           className="av-controls"
           showInteractive={false}
         />
+        <ZoomIndicator />
         <MiniMap
           className="av-minimap"
           nodeStrokeWidth={2}
