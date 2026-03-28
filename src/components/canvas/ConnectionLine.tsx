@@ -1,6 +1,6 @@
 import type { ConnectionLineComponentProps } from '@xyflow/react'
 import { useDiagramStore } from '@/store/diagram-store'
-import { getSignalColor } from '@/lib/signal-colors'
+import { getSignalColor, getSignalDashPattern } from '@/lib/signal-colors'
 import { validateConnection } from '@/lib/connection-validation'
 import type { AVPort, AVNodeData } from '@/types/av'
 import type { Node } from '@xyflow/react'
@@ -22,6 +22,7 @@ export default function ConnectionLine({
     (p: AVPort) => p.id === fromHandle?.id
   )
   const domainColor = sourcePort ? getSignalColor(sourcePort.domain) : '#888'
+  const domainDash = sourcePort ? getSignalDashPattern(sourcePort.domain) : '8 4'
 
   // Determine line color based on validation
   let color = domainColor
@@ -53,7 +54,7 @@ export default function ConnectionLine({
         fill="none"
         stroke={color}
         strokeWidth={isBlocked || isWarned ? 3 : 2}
-        strokeDasharray={isBlocked ? '6 4' : '8 4'}
+        strokeDasharray={isBlocked ? '6 4' : domainDash || undefined}
         strokeOpacity={0.7}
       />
       <circle
