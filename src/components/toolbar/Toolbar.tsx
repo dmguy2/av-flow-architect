@@ -26,7 +26,7 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: `${MOD}S`, action: 'Save project' },
       { keys: `${MOD}Z`, action: 'Undo' },
-      { keys: `${MOD}⇧Z`, action: 'Redo' },
+      { keys: `${MOD}⇧Z / ${MOD}Y`, action: 'Redo' },
       { keys: `${MOD}F`, action: 'Find device' },
       { keys: '?', action: 'Show keyboard shortcuts' },
     ],
@@ -134,6 +134,10 @@ export default function Toolbar() {
         } else {
           undo()
         }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+        e.preventDefault()
+        redo()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
