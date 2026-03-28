@@ -1,8 +1,17 @@
 import { toPng, toSvg } from 'html-to-image'
 import { jsPDF } from 'jspdf'
 import type { Node, Edge } from '@xyflow/react'
-import type { AVNodeData, AVEdgeData, SignalDomain } from '@/types/av'
+import type { AVNodeData, AVEdgeData, SignalDomain, ConnectorType, ConnectorVariant } from '@/types/av'
 import { SIGNAL_COLORS, SIGNAL_LABELS } from './signal-colors'
+import { VARIANT_LABELS } from './connector-variants'
+
+/** Format connector with variant for cable schedules (e.g., "HDMI Micro", "USB Type-C") */
+function formatConnector(connector: ConnectorType, variant?: ConnectorVariant): string {
+  if (variant && VARIANT_LABELS[variant]) {
+    return `${connector.toUpperCase()} ${VARIANT_LABELS[variant]}`
+  }
+  return connector.toUpperCase()
+}
 
 function getFlowElement(): HTMLElement | null {
   return document.querySelector('.react-flow__viewport') as HTMLElement | null
@@ -390,7 +399,7 @@ function drawCableSchedule(
       targetNode?.data.label ?? '—',
       targetPort?.label ?? '—',
       SIGNAL_LABELS[edge.data?.domain ?? 'audio'],
-      (edge.data?.connector ?? 'xlr').toUpperCase(),
+      formatConnector(edge.data?.connector ?? 'xlr', edge.data?.variant),
     ]
     const widths = [sCols.num, sCols.label, sCols.source, sCols.sourcePort, sCols.dest, sCols.destPort, sCols.signal, sCols.connector]
 
@@ -589,7 +598,7 @@ export function exportCableScheduleCsv(
       targetNode?.data.label ?? '',
       targetPort?.label ?? '',
       SIGNAL_LABELS[edge.data?.domain ?? 'audio'],
-      (edge.data?.connector ?? 'xlr').toUpperCase(),
+      formatConnector(edge.data?.connector ?? 'xlr', edge.data?.variant),
     ]
   })
 

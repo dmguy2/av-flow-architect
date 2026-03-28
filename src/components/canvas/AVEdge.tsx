@@ -7,6 +7,7 @@ import {
 } from '@xyflow/react'
 import type { AVEdgeData } from '@/types/av'
 import { getSignalColor, getSignalDashPattern, SIGNAL_SHORT_LABELS } from '@/lib/signal-colors'
+import { VARIANT_LABELS } from '@/lib/connector-variants'
 import { useDiagramStore } from '@/store/diagram-store'
 
 type AVEdgeType = Edge<AVEdgeData, 'avEdge'>
@@ -83,7 +84,10 @@ function AVEdge({
     updateEdgeData(id, { label: labelText.trim() || undefined })
   }
 
-  const displayLabel = data?.label || data?.connector
+  const connectorLabel = data?.variant && VARIANT_LABELS[data.variant]
+    ? `${data.connector} ${VARIANT_LABELS[data.variant]}`
+    : data?.connector
+  const displayLabel = data?.label || connectorLabel
   const shortLabel = SIGNAL_SHORT_LABELS[domain]
 
   return (

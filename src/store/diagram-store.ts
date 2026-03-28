@@ -257,6 +257,7 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     const edgeData: AVEdgeData = {
       domain: sourcePort?.domain ?? 'audio',
       connector: sourcePort?.connector ?? 'xlr',
+      ...(sourcePort?.variant && { variant: sourcePort.variant }),
       label: cableLabel,
     }
 

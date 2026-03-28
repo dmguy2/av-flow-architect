@@ -88,7 +88,7 @@ export default function PropertiesPanel() {
               <Label className="text-xs">Connector</Label>
               <select
                 value={edgeData?.connector ?? 'xlr'}
-                onChange={(e) => updateEdgeData(selectedEdge.id, { connector: e.target.value as ConnectorType })}
+                onChange={(e) => updateEdgeData(selectedEdge.id, { connector: e.target.value as ConnectorType, variant: undefined })}
                 className="h-7 text-xs border border-input rounded px-2 bg-transparent w-full"
               >
                 <option value="xlr">XLR</option>
@@ -113,6 +113,23 @@ export default function PropertiesPanel() {
               </select>
             </div>
 
+            {/* Connector Variant */}
+            {CONNECTOR_VARIANTS[edgeData?.connector ?? 'xlr']?.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Variant</Label>
+                <select
+                  value={edgeData?.variant ?? ''}
+                  onChange={(e) => updateEdgeData(selectedEdge.id, { variant: (e.target.value || undefined) as ConnectorVariant | undefined })}
+                  className="h-7 text-xs border border-input rounded px-2 bg-transparent w-full"
+                >
+                  <option value="">— Unspecified —</option>
+                  {CONNECTOR_VARIANTS[edgeData?.connector ?? 'xlr'].map((v) => (
+                    <option key={v} value={v}>{VARIANT_LABELS[v]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <Separator />
 
             {/* Connection info */}
@@ -133,7 +150,7 @@ export default function PropertiesPanel() {
                       {srcPort && (
                         <div className="text-[10px] text-muted-foreground pl-[38px]">
                           {srcPort.label}
-                          <span className="text-muted-foreground/50 ml-1">({(edgeData?.connector ?? srcPort.connector).toUpperCase()})</span>
+                          <span className="text-muted-foreground/50 ml-1">({(edgeData?.connector ?? srcPort.connector).toUpperCase()}{edgeData?.variant ? ` ${VARIANT_LABELS[edgeData.variant]}` : srcPort.variant ? ` ${VARIANT_LABELS[srcPort.variant]}` : ''})</span>
                         </div>
                       )}
                     </div>
@@ -145,7 +162,7 @@ export default function PropertiesPanel() {
                       {tgtPort && (
                         <div className="text-[10px] text-muted-foreground pl-[38px]">
                           {tgtPort.label}
-                          <span className="text-muted-foreground/50 ml-1">({tgtPort.connector.toUpperCase()})</span>
+                          <span className="text-muted-foreground/50 ml-1">({tgtPort.connector.toUpperCase()}{tgtPort.variant ? ` ${VARIANT_LABELS[tgtPort.variant]}` : ''})</span>
                         </div>
                       )}
                     </div>
