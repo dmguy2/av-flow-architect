@@ -84,6 +84,8 @@ export default function Toolbar() {
     chainIssues,
     viewMode,
     setViewMode,
+    pages,
+    activePageId,
   } = useDiagramStore()
 
   const showEdgeLabels = useDiagramStore((s) => s.showEdgeLabels)
@@ -441,6 +443,12 @@ export default function Toolbar() {
 
       {/* Status */}
       <div className="text-[11px] text-muted-foreground hidden md:flex items-center gap-2.5 tabular-nums">
+        {pages.length > 1 && (
+          <>
+            <span className="font-medium text-foreground/70">{pages.find((p) => p.id === activePageId)?.label ?? 'Page'}</span>
+            <span className="text-border">|</span>
+          </>
+        )}
         <span>{nodes.length} nodes</span>
         <span className="text-border">|</span>
         <span>{edges.length} edges</span>
