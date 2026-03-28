@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image, Box, RefreshCw, Loader2, LayoutDashboard, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Trash2, Plus, Minus, Cable, TriangleAlert, ToggleLeft, ToggleRight, Zap, ExternalLink, ChevronDown, ChevronRight, Image, Box, RefreshCw, Loader2, LayoutDashboard, AlertTriangle, CheckCircle2, Ungroup, Group } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,9 +13,11 @@ import { generateId } from '@/lib/utils'
 import type { AVNodeData, AVPort, AVComponentDef, SignalDomain, ConnectorType, ConnectorVariant, PortDirection, DeviceRole, ConferenceRole } from '@/types/av'
 import { CONNECTOR_VARIANTS, VARIANT_LABELS } from '@/lib/connector-variants'
 import { ALL_CONFERENCE_ROLES, CONFERENCE_ROLE_LABELS, CONFERENCE_ROLE_COLORS } from '@/lib/conference-roles'
+import { GROUP_COLORS } from '@/components/canvas/GroupNode'
 
 export default function PropertiesPanel() {
   const { nodes, edges, selectedNodeId, selectedEdgeId, updateNodeData, updateEdgeData, deleteSelected } = useDiagramStore()
+  const ungroupNodes = useDiagramStore((s) => s.ungroupNodes)
   const viewMode = useDiagramStore((s) => s.viewMode)
   const model3dStatus = useDiagramStore((s) => s.model3dStatus)
   const chainIssuesFromStore = useDiagramStore((s) => s.chainIssues)
@@ -295,6 +297,92 @@ export default function PropertiesPanel() {
                 No issues detected
               </div>
             )}
+          </div>
+        </ScrollArea>
+      </div>
+    )
+  }
+
+  // ── Group node properties ──
+  if (selectedNode.type === 'group') {
+    const groupData = selectedNode.data as { label: string; color?: string }
+    const groupColor = groupData.color || GROUP_COLORS[0].value
+    const memberCount = nodes.filter((n) => n.parentId === selectedNode.id).length
+
+    return (
+      <div className="border-l border-border bg-sidebar flex flex-col h-full animate-panel-slide-in">
+        <div className="p-3 pb-2">
+          <div className="flex items-center gap-2 mb-2">
+            <Group className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Group
+            </h2>
+          </div>
+        </div>
+        <Separator />
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-4">
+            {/* Label */}
+            <div className="space-y-1">
+              <Label className="text-xs">Label</Label>
+              <Input
+                value={groupData.label}
+                onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value } as never)}
+                className="h-7 text-xs"
+              />
+            </div>
+
+            {/* Color */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Color</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {GROUP_COLORS.map((gc) => (
+                  <button
+                    key={gc.value}
+                    className="w-6 h-6 rounded-md border-2 transition-transform hover:scale-110"
+                    style={{
+                      backgroundColor: gc.value,
+                      borderColor: groupColor === gc.value ? 'white' : gc.value,
+                      boxShadow: groupColor === gc.value ? `0 0 0 2px ${gc.value}` : undefined,
+                    }}
+                    title={gc.label}
+                    onClick={() => updateNodeData(selectedNode.id, { color: gc.value } as never)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Members */}
+            <div className="space-y-1">
+              <Label className="text-xs">Members</Label>
+              <div className="text-xs text-muted-foreground">
+                {memberCount} device{memberCount !== 1 ? 's' : ''} in this group
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Actions */}
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => ungroupNodes(selectedNode.id)}
+              >
+                <Ungroup className="w-3.5 h-3.5 mr-1" />
+                Ungroup
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="w-full"
+                onClick={deleteSelected}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete Group
+              </Button>
+            </div>
           </div>
         </ScrollArea>
       </div>
