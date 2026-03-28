@@ -36,6 +36,14 @@ export default function LayerPanel() {
   const toggleLayerVisibility = useDiagramStore((s) => s.toggleLayerVisibility)
   const setFocusedLayer = useDiagramStore((s) => s.setFocusedLayer)
   const setShowEdgeLabels = useDiagramStore((s) => s.setShowEdgeLabels)
+  const edges = useDiagramStore((s) => s.edges)
+
+  // Count cables per signal domain
+  const domainCounts: Record<string, number> = {}
+  for (const e of edges) {
+    const d = e.data?.domain ?? 'audio'
+    domainCounts[d] = (domainCounts[d] || 0) + 1
+  }
 
   return (
     <div className="p-2 space-y-1">
@@ -43,6 +51,7 @@ export default function LayerPanel() {
         const isVisible = layerVisibility[domain]
         const isFocused = focusedLayer === domain
         const color = SIGNAL_COLORS[domain]
+        const count = domainCounts[domain] || 0
 
         return (
           <div
@@ -58,9 +67,12 @@ export default function LayerPanel() {
             {/* Dash preview */}
             <DashPreview domain={domain} />
 
-            {/* Label */}
-            <span className="text-xs font-medium flex-1 truncate">
+            {/* Label + count */}
+            <span className={`text-xs font-medium flex-1 truncate ${count === 0 ? 'text-muted-foreground/50' : ''}`}>
               {SIGNAL_LABELS[domain]}
+              {count > 0 && (
+                <span className="ml-1 text-[9px] font-normal text-muted-foreground tabular-nums">{count}</span>
+              )}
             </span>
 
             {/* Focus button */}
